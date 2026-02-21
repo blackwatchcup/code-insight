@@ -26,7 +26,7 @@ class ImportProjectRequest(BaseModel):
 async def list_projects(page: int = 1, page_size: int = 10, db: Session = Depends(get_db)):
     project_service = ProjectService(db)
     projects, total = project_service.list_projects(page, page_size)
-    return {"code": 200, "data": {"items": projects, "total": total}}
+    return {"code": 200, "data": {"items": [p.to_dict() for p in projects], "total": total}}
 
 @router.post("/")
 async def create_project(request: CreateProjectRequest, db: Session = Depends(get_db)):
@@ -38,7 +38,7 @@ async def create_project(request: CreateProjectRequest, db: Session = Depends(ge
         name=request.name,
         local_path=request.local_path
     )
-    return {"code": 200, "data": project}
+    return {"code": 200, "data": project.to_dict()}
 
 @router.post("/import")
 async def import_project(request: ImportProjectRequest, db: Session = Depends(get_db)):
@@ -55,7 +55,7 @@ async def import_project(request: ImportProjectRequest, db: Session = Depends(ge
             name=request.name
         )
     
-    return {"code": 200, "data": project}
+    return {"code": 200, "data": project.to_dict()}
 
 @router.get("/{project_id}")
 async def get_project(project_id: str, db: Session = Depends(get_db)):
@@ -63,7 +63,7 @@ async def get_project(project_id: str, db: Session = Depends(get_db)):
     project = project_service.get_project(project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    return {"code": 200, "data": project}
+    return {"code": 200, "data": project.to_dict()}
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, db: Session = Depends(get_db)):
