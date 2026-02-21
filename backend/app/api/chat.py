@@ -9,6 +9,7 @@ import asyncio
 from app.core.database import get_db
 from app.core.auth import get_current_user
 from app.models.user import User
+from app.models.project import Project
 from app.services.rag_service import get_rag_service, RAGService
 from app.rag.qa_service import QAType
 
@@ -51,7 +52,7 @@ class HistoryResponse(BaseModel):
 @router.post("/ask", response_model=AskResponse, tags=["Chat"])
 async def ask_question(
     request: AskRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
     rag_service: RAGService = Depends(get_rag_service)
 ):
     qa_type = None
@@ -74,7 +75,7 @@ async def ask_question(
 @router.post("/ask/stream", tags=["Chat"])
 async def ask_question_stream(
     request: AskRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
     rag_service: RAGService = Depends(get_rag_service)
 ):
     qa_type = None
@@ -111,7 +112,7 @@ async def ask_question_stream(
 @router.post("/search", response_model=SearchResponse, tags=["Chat"])
 async def search_code(
     request: SearchRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
     rag_service: RAGService = Depends(get_rag_service)
 ):
     results = rag_service.search(
@@ -126,21 +127,38 @@ async def search_code(
 @router.post("/index", response_model=IndexResponse, tags=["Chat"])
 async def index_project(
     request: IndexRequest,
-    current_user: User = Depends(get_current_user),
-    rag_service: RAGService = Depends(get_rag_service)
+    current_user: Optional[User] = Depends(get_current_user),
+    rag_service: RAGService = Depends(get_rag_service),
+    db: Session = Depends(get_db)
 ):
+    from app.services.project_service import ProjectService
+    from app.models.project import ProjectStatus
+    
     result = await rag_service.index_project(
         project_id=request.project_id,
         project_path=request.project_path,
         file_extensions=request.file_extensions
     )
     
+    # Update project status to READY after successful indexing
+    if result.get("success"):
+        project_service = ProjectService(db)
+        project = project_service.get_project(request.project_id)
+        if project:
+            from sqlalchemy import update
+            db.execute(
+                update(Project)
+                .where(Project.id == request.project_id)
+                .values(status=ProjectStatus.READY)
+            )
+            db.commit()
+    
     return IndexResponse(code=200, data=result)
 
 @router.delete("/index/{project_id}", tags=["Chat"])
 async def delete_project_index(
     project_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
     rag_service: RAGService = Depends(get_rag_service)
 ):
     result = rag_service.delete_project_index(project_id)
@@ -150,7 +168,7 @@ async def delete_project_index(
 async def get_chat_history(
     session_id: str,
     limit: Optional[int] = Query(None, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
     rag_service: RAGService = Depends(get_rag_service)
 ):
     history = rag_service.get_chat_history(session_id, limit)
@@ -159,7 +177,7 @@ async def get_chat_history(
 @router.delete("/history/{session_id}", tags=["Chat"])
 async def clear_chat_history(
     session_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
     rag_service: RAGService = Depends(get_rag_service)
 ):
     rag_service.clear_chat_history(session_id)
@@ -167,7 +185,7 @@ async def clear_chat_history(
 
 @router.get("/stats", tags=["Chat"])
 async def get_stats(
-    current_user: User = Depends(get_current_user),
+    current_user: Optional[User] = Depends(get_current_user),
     rag_service: RAGService = Depends(get_rag_service)
 ):
     stats = rag_service.get_stats()

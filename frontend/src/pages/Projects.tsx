@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useProjectStore } from '../stores/projectStore'
 import ProjectCard from '../components/ProjectCard'
 import ImportDialog from '../components/ImportDialog'
 
 export default function Projects() {
+  const navigate = useNavigate()
   const { projects, isLoading, error, fetchProjects, importProject, deleteProject, isImporting } =
     useProjectStore()
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -111,6 +113,7 @@ export default function Projects() {
                 key={project.id}
                 project={project}
                 onDelete={() => handleDeleteProject(project.id)}
+                onClick={() => navigate(`/project/${project.id}`)}
               />
             ))}
           </div>

@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import Projects from './pages/Projects'
 import Login from './pages/Login'
+import Chat from './pages/Chat'
+import Analysis from './pages/Analysis'
+import ProjectDetail from './pages/ProjectDetail'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
 import { useAuthStore } from './stores/authStore'
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, fetchUser, isLoading } = useAuthStore()
+  const { isAuthenticated, fetchUser } = useAuthStore()
   const [checking, setChecking] = useState(true)
   
   useEffect(() => {
@@ -33,29 +36,66 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export default function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState('projects')
-  const { isAuthenticated, logout, user } = useAuthStore()
+  const { logout, user } = useAuthStore()
+  const location = useLocation()
+  const navigate = useNavigate()
 
+  useEffect(() => {
+    if (location.pathname === '/') {
+      setActiveTab('projects')
+    } else if (location.pathname.startsWith('/chat')) {
+      setActiveTab('chat')
+    } else if (location.pathname.startsWith('/project')) {
+      setActiveTab('projects')
+    } else if (location.pathname.startsWith('/analysis')) {
+      setActiveTab('analysis')
+    }
+  }, [location.pathname])
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    switch (tab) {
+      case 'projects':
+        navigate('/')
+        break
+      case 'chat':
+        navigate('/chat')
+        break
+      case 'analysis':
+        navigate('/analysis')
+        break
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col">
+      <Navbar user={user} onLogout={logout} />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
+        <main className="flex-1 overflow-y-auto">
+          <Routes>
+            <Route path="/" element={<Projects />} />
+            <Route path="/chat" element={<Chat />} />
+            <Route path="/chat/:projectId" element={<Chat />} />
+            <Route path="/project/:id" element={<ProjectDetail />} />
+            <Route path="/analysis" element={<Analysis />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={
-          isAuthenticated ? <Navigate to="/" replace /> : <Login />
-        } />
+        <Route path="/login" element={<Login />} />
         <Route path="/*" element={
           <PrivateRoute>
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col">
-              <Navbar user={user} onLogout={logout} />
-              <div className="flex flex-1 overflow-hidden">
-                <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
-                <main className="flex-1 overflow-y-auto">
-                  <Routes>
-                    <Route path="/" element={<Projects />} />
-                  </Routes>
-                </main>
-              </div>
-            </div>
+            <AppContent />
           </PrivateRoute>
         } />
       </Routes>

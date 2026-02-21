@@ -10,7 +10,7 @@ python-multipart==0.0.6
 httpx==0.26.0
 gitpython==3.1.41
 requests==2.31.0
-chromadb==0.4.22
+numpy>=1.24.0
 openai==1.10.0
 tiktoken==0.5.2
 tree-sitter==0.21.3

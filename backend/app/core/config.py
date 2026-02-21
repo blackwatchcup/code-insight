@@ -14,10 +14,12 @@ class Settings(BaseSettings):
     CHROMA_DIR: str = "./data/chroma"
     
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4"
+    OPENAI_MODEL: str = "deepseek-chat"
+    OPENAI_BASE_URL: str = "https://api.deepseek.com"
     CLAUDE_API_KEY: str = ""
     
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_BASE_URL: Optional[str] = None
     CHUNK_SIZE: int = 500
     CHUNK_OVERLAP: int = 50
     

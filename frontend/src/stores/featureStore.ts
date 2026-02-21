@@ -23,10 +23,11 @@ export const useFeatureStore = create<FeatureStore>((set) => ({
     try {
       const res = await api.get(`/features/${projectId}`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load features'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -35,10 +36,11 @@ export const useFeatureStore = create<FeatureStore>((set) => ({
     try {
       const res = await api.get(`/features/${projectId}/summary`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load summary'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -47,10 +49,11 @@ export const useFeatureStore = create<FeatureStore>((set) => ({
     try {
       const res = await api.get(`/features/${projectId}/frontend`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load frontend features'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -59,10 +62,11 @@ export const useFeatureStore = create<FeatureStore>((set) => ({
     try {
       const res = await api.get(`/features/${projectId}/backend`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load backend features'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -71,10 +75,11 @@ export const useFeatureStore = create<FeatureStore>((set) => ({
     try {
       const res = await api.get(`/features/${projectId}/apis`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load API endpoints'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -83,10 +88,11 @@ export const useFeatureStore = create<FeatureStore>((set) => ({
     try {
       const res = await api.get(`/features/${projectId}/models`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load data models'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -95,10 +101,11 @@ export const useFeatureStore = create<FeatureStore>((set) => ({
     try {
       const res = await api.get(`/features/${projectId}/system`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load system features'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
 }))

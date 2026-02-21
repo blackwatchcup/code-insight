@@ -22,13 +22,16 @@ class RAGService:
         llm_config: Optional[LLMConfig] = None
     ):
         self.embedding_config = embedding_config or EmbeddingConfig(
-            api_key=settings.OPENAI_API_KEY
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.EMBEDDING_BASE_URL,
+            model_name=settings.EMBEDDING_MODEL
         )
         self.vector_store_config = vector_store_config or VectorStoreConfig(
             persist_directory=settings.CHROMA_DIR
         )
         self.llm_config = llm_config or LLMConfig(
             api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL,
             model=settings.OPENAI_MODEL
         )
         

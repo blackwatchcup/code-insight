@@ -5,8 +5,9 @@ import os
 
 @dataclass
 class EmbeddingConfig:
-    model_name: str = "text-embedding-ada-002"
+    model_name: str = "text-embedding-3-small"
     api_key: Optional[str] = None
+    base_url: Optional[str] = None
     chunk_size: int = 1000
     chunk_overlap: int = 200
     max_tokens: int = 8191
@@ -24,7 +25,11 @@ class CodeEmbedder:
     def __init__(self, config: Optional[EmbeddingConfig] = None):
         self.config = config or EmbeddingConfig()
         self.api_key = config.api_key if config else os.getenv("OPENAI_API_KEY")
-        self._encoding = tiktoken.encoding_for_model(self.config.model_name)
+        self.base_url = config.base_url if config else os.getenv("EMBEDDING_BASE_URL")
+        try:
+            self._encoding = tiktoken.encoding_for_model(self.config.model_name)
+        except KeyError:
+            self._encoding = tiktoken.get_encoding("cl100k_base")
     
     def embed(self, text: str) -> List[float]:
         return self._get_embedding(text)
@@ -34,7 +39,10 @@ class CodeEmbedder:
     
     def _get_embedding(self, text: str) -> List[float]:
         import openai
-        client = openai.OpenAI(api_key=self.api_key)
+        client_kwargs = {"api_key": self.api_key}
+        if self.base_url:
+            client_kwargs["base_url"] = self.base_url
+        client = openai.OpenAI(**client_kwargs)
         text = text.replace("\n", " ")
         response = client.embeddings.create(
             model=self.config.model_name,

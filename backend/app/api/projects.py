@@ -130,3 +130,30 @@ async def delete_project(
     if not success:
         raise HTTPException(404, "Project not found")
     return {"code": 200, "data": {"message": "Project deleted"}}
+
+@router.patch("/{project_id}/status", tags=["Projects"])
+async def update_project_status(
+    project_id: str,
+    status: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user)
+):
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+    
+    if not project:
+        raise HTTPException(404, "Project not found")
+    
+    # Check access permission
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(403, "Access denied")
+    
+    from app.models.project import ProjectStatus
+    try:
+        new_status = ProjectStatus(status)
+        project.status = new_status
+        db.commit()
+        return {"code": 200, "data": {"message": "Status updated"}}
+    except ValueError:
+        raise HTTPException(400, "Invalid status value")

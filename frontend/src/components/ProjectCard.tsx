@@ -3,9 +3,10 @@ import type { Project } from '../types'
 interface ProjectCardProps {
   project: Project
   onDelete: () => void
+  onClick?: () => void
 }
 
-export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
+export default function ProjectCard({ project, onDelete, onClick }: ProjectCardProps) {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ready':
@@ -38,13 +39,22 @@ export default function ProjectCard({ project, onDelete }: ProjectCardProps) {
     }
     return (
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m-9 9a9 9 0 019-9" />
       </svg>
     )
   }
 
+  const handleCardClick = () => {
+    if (onClick) {
+      onClick()
+    }
+  }
+
   return (
-    <div className="group bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200/50 p-5 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-200/50 transition-all duration-300 cursor-pointer">
+    <div
+      className="group bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200/50 p-5 hover:shadow-xl hover:shadow-blue-500/5 hover:border-blue-200/50 transition-all duration-300 cursor-pointer"
+      onClick={handleCardClick}
+    >
       <div className="flex justify-between items-start mb-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">

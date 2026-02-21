@@ -40,7 +40,7 @@ class ProjectService:
             source_type=SourceType.LOCAL,
             source_url=local_path,
             local_path=str(project_dir),
-            status=ProjectStatus.INDEXING,
+            status=ProjectStatus.READY,
             file_count=file_count,
             line_count=line_count,
         )

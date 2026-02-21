@@ -51,7 +51,7 @@ class ImportService:
             source_url=url,
             local_path=str(project_dir),
             branch=branch,
-            status=ProjectStatus.INDEXING,
+            status=ProjectStatus.READY,
             file_count=file_count,
             line_count=line_count,
         )
@@ -98,7 +98,7 @@ class ImportService:
                 source_type=SourceType.ZIP,
                 source_url=url,
                 local_path=str(project_dir),
-                status=ProjectStatus.INDEXING,
+                status=ProjectStatus.READY,
                 file_count=file_count,
                 line_count=line_count,
             )

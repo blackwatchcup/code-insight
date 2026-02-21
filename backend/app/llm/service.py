@@ -5,8 +5,9 @@ import openai
 
 @dataclass
 class LLMConfig:
-    model: str = "gpt-4"
+    model: str = "deepseek-chat"
     api_key: Optional[str] = None
+    base_url: Optional[str] = None
     temperature: float = 0.7
     max_tokens: int = 2000
     system_prompt: str = "You are a helpful code assistant."
@@ -15,8 +16,14 @@ class LLMService:
     def __init__(self, config: Optional[LLMConfig] = None):
         self.config = config or LLMConfig()
         self.api_key = config.api_key if config else os.getenv("OPENAI_API_KEY")
-        self._client = openai.OpenAI(api_key=self.api_key)
-        self._async_client = openai.AsyncOpenAI(api_key=self.api_key)
+        self.base_url = config.base_url if config else os.getenv("OPENAI_BASE_URL")
+        
+        client_kwargs = {"api_key": self.api_key}
+        if self.base_url:
+            client_kwargs["base_url"] = self.base_url
+        
+        self._client = openai.OpenAI(**client_kwargs)
+        self._async_client = openai.AsyncOpenAI(**client_kwargs)
     
     async def generate(
         self, 

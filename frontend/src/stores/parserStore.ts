@@ -59,10 +59,11 @@ export const useParserStore = create<ParserStore>((set) => ({
     try {
       const res = await api.get(`/parser/project/${projectId}/structure`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load structure'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -71,10 +72,11 @@ export const useParserStore = create<ParserStore>((set) => ({
     try {
       const res = await api.get(`/parser/project/${projectId}/call-graph`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load call graph'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -83,10 +85,11 @@ export const useParserStore = create<ParserStore>((set) => ({
     try {
       const res = await api.get(`/parser/project/${projectId}/dependencies`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load dependencies'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
   
@@ -95,10 +98,11 @@ export const useParserStore = create<ParserStore>((set) => ({
     try {
       const res = await api.get(`/parser/project/${projectId}/summary`)
       set({ isLoading: false })
-      return res.data.data || res.data
+      return res.data?.data || res.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load summary'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
     }
   },
 }))

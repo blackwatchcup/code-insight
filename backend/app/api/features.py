@@ -28,7 +28,7 @@ async def get_features(
             raise HTTPException(status_code=403, detail="Access denied")
     
     feature_service = FeatureService(db)
-    tree = await feature_service.get_feature_tree(project_id, project.local_path)
+    tree = await feature_service.get_feature_tree(project_id, str(project.local_path))
     
     return {"code": 200, "data": tree.to_dict()}
 
@@ -50,7 +50,7 @@ async def get_feature_summary(
             raise HTTPException(status_code=403, detail="Access denied")
     
     feature_service = FeatureService(db)
-    tree = await feature_service.get_feature_tree(project_id, project.local_path)
+    tree = await feature_service.get_feature_tree(project_id, str(project.local_path))
     
     return {"code": 200, "data": tree.get_summary()}
 
@@ -72,7 +72,7 @@ async def get_frontend_features(
             raise HTTPException(status_code=403, detail="Access denied")
     
     feature_service = FeatureService(db)
-    features = await feature_service.get_frontend_features(project.local_path)
+    features = await feature_service.get_frontend_features(str(project.local_path))
     
     return {"code": 200, "data": features}
 
@@ -94,7 +94,7 @@ async def get_backend_features(
             raise HTTPException(status_code=403, detail="Access denied")
     
     feature_service = FeatureService(db)
-    features = await feature_service.get_backend_features(project.local_path)
+    features = await feature_service.get_backend_features(str(project.local_path))
     
     return {"code": 200, "data": features}
 
@@ -116,7 +116,7 @@ async def get_api_endpoints(
             raise HTTPException(status_code=403, detail="Access denied")
     
     feature_service = FeatureService(db)
-    apis = await feature_service.get_api_endpoints(project.local_path)
+    apis = await feature_service.get_api_endpoints(str(project.local_path))
     
     return {"code": 200, "data": apis}
 
@@ -138,7 +138,7 @@ async def get_data_models(
             raise HTTPException(status_code=403, detail="Access denied")
     
     feature_service = FeatureService(db)
-    models = await feature_service.get_data_models(project.local_path)
+    models = await feature_service.get_data_models(str(project.local_path))
     
     return {"code": 200, "data": models}
 
@@ -160,6 +160,6 @@ async def get_system_features(
             raise HTTPException(status_code=403, detail="Access denied")
     
     feature_service = FeatureService(db)
-    features = await feature_service.get_system_features(project.local_path)
+    features = await feature_service.get_system_features(str(project.local_path))
     
     return {"code": 200, "data": features}

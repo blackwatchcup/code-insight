@@ -32,8 +32,14 @@ export const useChatStore = create<ChatStore>((set) => ({
       set({ isLoading: false })
       return res.data.data
     } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      throw err
+      const errorMessage = err.response?.data?.detail || 
+                           err.response?.data?.message || 
+                           err.response?.data ||
+                           err.message || 
+                           'Failed to get response'
+      console.error('Chat error:', err)
+      set({ error: errorMessage, isLoading: false })
+      throw new Error(errorMessage)
     }
   },
   

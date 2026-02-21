@@ -60,7 +60,7 @@ async def parse_file(request: FileParseRequest):
 
 
 @router.get("/project/{project_id}/structure", tags=["Parser"])
-async def get_project_structure(project_id: int):
+async def get_project_structure(project_id: str):
     from app.services.project_service import ProjectService
     from app.core.database import SessionLocal
     
@@ -72,7 +72,7 @@ async def get_project_structure(project_id: int):
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        structure = await structure_service.extract_structure(project.local_path)
+        structure = await structure_service.extract_structure(str(project.local_path))
         
         return {
             "code": 200,
@@ -93,7 +93,7 @@ async def get_project_structure(project_id: int):
 
 
 @router.get("/project/{project_id}/call-graph", tags=["Parser"])
-async def get_call_graph(project_id: int):
+async def get_call_graph(project_id: str):
     from app.services.project_service import ProjectService
     from app.core.database import SessionLocal
     
@@ -105,7 +105,7 @@ async def get_call_graph(project_id: int):
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        structure = await structure_service.extract_structure(project.local_path)
+        structure = await structure_service.extract_structure(str(project.local_path))
         call_graph = call_graph_builder.build(structure.files)
         
         return {
@@ -117,7 +117,7 @@ async def get_call_graph(project_id: int):
 
 
 @router.get("/project/{project_id}/dependencies", tags=["Parser"])
-async def get_dependencies(project_id: int):
+async def get_dependencies(project_id: str):
     from app.services.project_service import ProjectService
     from app.core.database import SessionLocal
     
@@ -129,8 +129,8 @@ async def get_dependencies(project_id: int):
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        structure = await structure_service.extract_structure(project.local_path)
-        dep_graph = dependency_analyzer.analyze(structure.files, project.local_path)
+        structure = await structure_service.extract_structure(str(project.local_path))
+        dep_graph = dependency_analyzer.analyze(structure.files, str(project.local_path))
         
         circular = dependency_analyzer.find_circular_dependencies(dep_graph)
         most_depended = dependency_analyzer.get_most_depended_on(dep_graph)
@@ -150,7 +150,7 @@ async def get_dependencies(project_id: int):
 
 
 @router.get("/project/{project_id}/summary", tags=["Parser"])
-async def get_project_summary(project_id: int):
+async def get_project_summary(project_id: str):
     from app.services.project_service import ProjectService
     from app.core.database import SessionLocal
     
@@ -162,10 +162,10 @@ async def get_project_summary(project_id: int):
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         
-        structure = await structure_service.extract_structure(project.local_path)
+        structure = await structure_service.extract_structure(str(project.local_path))
         
         call_graph = call_graph_builder.build(structure.files)
-        dep_graph = dependency_analyzer.analyze(structure.files, project.local_path)
+        dep_graph = dependency_analyzer.analyze(structure.files, str(project.local_path))
         
         return {
             "code": 200,

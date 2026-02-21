@@ -49,7 +49,6 @@ async def register(
     except ValueError as e:
         raise HTTPException(400, str(e))
     
-    token = user_service.authenticate(data.username, data.password)
     _, access_token = user_service.login(data.username, data.password)
     
     return LoginResponse(
