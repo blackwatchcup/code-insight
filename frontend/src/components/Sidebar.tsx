@@ -52,31 +52,22 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
   ]
 
   return (
-    <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-white/80 backdrop-blur-sm border-r border-gray-200/50 flex flex-col transition-all duration-300`}>
-      {/* Logo */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200/50">
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-              </svg>
-            </div>
-            <span className="font-bold text-gray-900">CodeInsight</span>
-          </div>
-        )}
+    <aside className={`${collapsed ? 'w-16' : 'w-56'} bg-white/80 backdrop-blur-sm border-r border-gray-200/50 flex flex-col transition-all duration-300`}>
+      {/* Collapse Button */}
+      <div className="h-12 flex items-center justify-end px-3 border-b border-gray-200/50">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700 transition-colors"
+          title={collapsed ? '展开' : '收起'}
         >
-          <svg className={`w-5 h-5 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className={`w-4 h-4 transition-transform ${collapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
           </svg>
         </button>
       </div>
 
       {/* Menu */}
-      <nav className="flex-1 p-3 space-y-1">
+      <nav className="flex-1 p-2 space-y-1">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -89,11 +80,12 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
                 ? 'text-gray-300 cursor-not-allowed'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
             }`}
+            title={collapsed ? item.label : undefined}
           >
-            {item.icon}
+            <span className="flex-shrink-0">{item.icon}</span>
             {!collapsed && (
               <>
-                <span className="flex-1 text-left">{item.label}</span>
+                <span className="flex-1 text-left text-sm">{item.label}</span>
                 {item.disabled && (
                   <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">即将推出</span>
                 )}
@@ -105,15 +97,15 @@ export default function Sidebar({ activeTab, onTabChange }: SidebarProps) {
 
       {/* Footer */}
       {!collapsed && (
-        <div className="p-4 border-t border-gray-200/50">
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-2">
+        <div className="p-3 border-t border-gray-200/50">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-3">
+            <div className="flex items-center gap-2 mb-1.5">
               <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               <span className="text-sm font-medium text-gray-900">快速开始</span>
             </div>
-            <p className="text-xs text-gray-500">导入您的第一个项目，开始AI代码分析</p>
+            <p className="text-xs text-gray-500">导入项目，开始AI代码分析</p>
           </div>
         </div>
       )}
