@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, DateTime, Integer, Enum
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 import enum
 
@@ -12,9 +13,13 @@ class SourceType(str, enum.Enum):
     ZIP = "zip"
 
 class ProjectStatus(str, enum.Enum):
+    PENDING = "pending"
     INDEXING = "indexing"
+    ANALYZING = "analyzing"
     READY = "ready"
+    COMPLETED = "completed"
     ERROR = "error"
+    FAILED = "failed"
 
 class Project(Base):
     __tablename__ = "projects"
@@ -30,3 +35,8 @@ class Project(Base):
     line_count = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    files = relationship("File", back_populates="project", cascade="all, delete-orphan")
+    chats = relationship("Chat", back_populates="project", cascade="all, delete-orphan")
+    features = relationship("Feature", back_populates="project", cascade="all, delete-orphan")
