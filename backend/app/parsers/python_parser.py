@@ -116,18 +116,33 @@ class PythonParser(BaseParser):
                     ParameterInfo(name=self._get_node_text(child, content) or "")
                 )
             elif child.type == "typed_parameter":
-                name = self._get_node_text(child.child_by_field_name("name"), content) or ""
+                # Get the first identifier child as the parameter name
+                name = ""
+                for subchild in child.children:
+                    if subchild.type == "identifier":
+                        name = self._get_node_text(subchild, content) or ""
+                        break
                 type_ann = self._get_node_text(child.child_by_field_name("type"), content) or ""
                 parameters.append(ParameterInfo(name=name, type_annotation=type_ann))
             elif child.type == "default_parameter":
-                name = self._get_node_text(child.child_by_field_name("name"), content) or ""
+                # Get the first identifier child as the parameter name
+                name = ""
+                for subchild in child.children:
+                    if subchild.type == "identifier":
+                        name = self._get_node_text(subchild, content) or ""
+                        break
                 default = self._get_node_text(child.child_by_field_name("value"), content) or ""
                 type_ann = self._get_node_text(child.child_by_field_name("type"), content) or ""
                 parameters.append(
                     ParameterInfo(name=name, type_annotation=type_ann, default_value=default)
                 )
             elif child.type == "typed_default_parameter":
-                name = self._get_node_text(child.child_by_field_name("name"), content) or ""
+                # Get the first identifier child as the parameter name
+                name = ""
+                for subchild in child.children:
+                    if subchild.type == "identifier":
+                        name = self._get_node_text(subchild, content) or ""
+                        break
                 default = self._get_node_text(child.child_by_field_name("value"), content) or ""
                 type_ann = self._get_node_text(child.child_by_field_name("type"), content) or ""
                 parameters.append(
@@ -241,9 +256,17 @@ class PythonParser(BaseParser):
             elif child.type == "import_from_statement":
                 module = ""
                 names = []
+                found_module = False
+                
                 for subchild in child.children:
                     if subchild.type == "dotted_name":
-                        module = self._get_node_text(subchild, content) or ""
+                        if not found_module:
+                            # First dotted_name is the module name
+                            module = self._get_node_text(subchild, content) or ""
+                            found_module = True
+                        else:
+                            # Subsequent dotted_names are imported names
+                            names.append(self._get_node_text(subchild, content) or "")
                     elif subchild.type == "wildcard_import":
                         names.append("*")
                     elif subchild.type == "import_list":
@@ -254,6 +277,7 @@ class PythonParser(BaseParser):
                                 name = self._get_node_text(name_node.child_by_field_name("name"), content) or ""
                                 alias = self._get_node_text(name_node.child_by_field_name("alias"), content) or ""
                                 names.append(f"{name} as {alias}")
+                
                 imports.append(
                     ImportInfo(module=module, names=names, is_from_import=True)
                 )

@@ -108,6 +108,8 @@ class TypeScriptParser(BaseParser):
 
         parameters = self._extract_parameters(node, content)
         return_type = self._get_node_text(node.child_by_field_name("return_type"), content) or ""
+        # Clean up return type: remove leading colon and whitespace
+        return_type = return_type.lstrip(':').strip()
         body = self._get_node_text(node.child_by_field_name("body"), content) or ""
 
         return FunctionInfo(
@@ -126,6 +128,8 @@ class TypeScriptParser(BaseParser):
 
         parameters = self._extract_parameters(node, content)
         return_type = self._get_node_text(node.child_by_field_name("return_type"), content) or ""
+        # Clean up return type: remove leading colon and whitespace
+        return_type = return_type.lstrip(':').strip()
 
         return FunctionInfo(
             name=name,
@@ -149,6 +153,8 @@ class TypeScriptParser(BaseParser):
 
         parameters = self._extract_parameters(node, content)
         return_type = self._get_node_text(node.child_by_field_name("return_type"), content) or ""
+        # Clean up return type: remove leading colon and whitespace
+        return_type = return_type.lstrip(':').strip()
         body = self._get_node_text(node.child_by_field_name("body"), content) or ""
 
         return FunctionInfo(
@@ -168,6 +174,8 @@ class TypeScriptParser(BaseParser):
 
         parameters = self._extract_parameters(node, content)
         return_type = self._get_node_text(node.child_by_field_name("return_type"), content) or ""
+        # Clean up return type: remove leading colon and whitespace
+        return_type = return_type.lstrip(':').strip()
 
         return FunctionInfo(
             name=name,
