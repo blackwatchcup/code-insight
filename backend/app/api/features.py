@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 router = APIRouter()
 
 
-@router.get("/{project_id}")
+@router.get("/{project_id}", tags=["Features"])
 async def get_features(
     project_id: str,
     db: Session = Depends(get_db),
@@ -33,7 +33,7 @@ async def get_features(
     return {"code": 200, "data": tree.to_dict()}
 
 
-@router.get("/{project_id}/summary")
+@router.get("/{project_id}/summary", tags=["Features"])
 async def get_feature_summary(
     project_id: str,
     db: Session = Depends(get_db),
@@ -55,7 +55,7 @@ async def get_feature_summary(
     return {"code": 200, "data": tree.get_summary()}
 
 
-@router.get("/{project_id}/frontend")
+@router.get("/{project_id}/frontend", tags=["Features"])
 async def get_frontend_features(
     project_id: str,
     db: Session = Depends(get_db),
@@ -77,7 +77,7 @@ async def get_frontend_features(
     return {"code": 200, "data": features}
 
 
-@router.get("/{project_id}/backend")
+@router.get("/{project_id}/backend", tags=["Features"])
 async def get_backend_features(
     project_id: str,
     db: Session = Depends(get_db),
@@ -99,7 +99,7 @@ async def get_backend_features(
     return {"code": 200, "data": features}
 
 
-@router.get("/{project_id}/apis")
+@router.get("/{project_id}/apis", tags=["Features"])
 async def get_api_endpoints(
     project_id: str,
     db: Session = Depends(get_db),
@@ -121,7 +121,7 @@ async def get_api_endpoints(
     return {"code": 200, "data": apis}
 
 
-@router.get("/{project_id}/models")
+@router.get("/{project_id}/models", tags=["Features"])
 async def get_data_models(
     project_id: str,
     db: Session = Depends(get_db),
@@ -143,7 +143,7 @@ async def get_data_models(
     return {"code": 200, "data": models}
 
 
-@router.get("/{project_id}/system")
+@router.get("/{project_id}/system", tags=["Features"])
 async def get_system_features(
     project_id: str,
     db: Session = Depends(get_db),

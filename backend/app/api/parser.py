@@ -30,7 +30,7 @@ call_graph_builder = CallGraphBuilder()
 dependency_analyzer = DependencyAnalyzer()
 
 
-@router.get("/languages")
+@router.get("/languages", tags=["Parser"])
 async def get_supported_languages():
     return {
         "languages": ParserFactory.supported_languages(),
@@ -38,7 +38,7 @@ async def get_supported_languages():
     }
 
 
-@router.get("/extensions")
+@router.get("/extensions", tags=["Parser"])
 async def get_supported_extensions():
     return {
         "extensions": ParserFactory.supported_extensions(),
@@ -49,7 +49,7 @@ async def get_supported_extensions():
     }
 
 
-@router.post("/file")
+@router.post("/file", tags=["Parser"])
 async def parse_file(request: FileParseRequest):
     result = structure_service.extract_file_structure(request.file_path)
     
@@ -59,7 +59,7 @@ async def parse_file(request: FileParseRequest):
     return {"code": 200, "data": result.to_dict()}
 
 
-@router.get("/project/{project_id}/structure")
+@router.get("/project/{project_id}/structure", tags=["Parser"])
 async def get_project_structure(project_id: int):
     from app.services.project_service import ProjectService
     from app.core.database import SessionLocal
@@ -92,7 +92,7 @@ async def get_project_structure(project_id: int):
         db.close()
 
 
-@router.get("/project/{project_id}/call-graph")
+@router.get("/project/{project_id}/call-graph", tags=["Parser"])
 async def get_call_graph(project_id: int):
     from app.services.project_service import ProjectService
     from app.core.database import SessionLocal
@@ -116,7 +116,7 @@ async def get_call_graph(project_id: int):
         db.close()
 
 
-@router.get("/project/{project_id}/dependencies")
+@router.get("/project/{project_id}/dependencies", tags=["Parser"])
 async def get_dependencies(project_id: int):
     from app.services.project_service import ProjectService
     from app.core.database import SessionLocal
@@ -149,7 +149,7 @@ async def get_dependencies(project_id: int):
         db.close()
 
 
-@router.get("/project/{project_id}/summary")
+@router.get("/project/{project_id}/summary", tags=["Parser"])
 async def get_project_summary(project_id: int):
     from app.services.project_service import ProjectService
     from app.core.database import SessionLocal

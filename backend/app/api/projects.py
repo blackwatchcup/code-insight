@@ -24,7 +24,7 @@ class ImportProjectRequest(BaseModel):
     token: Optional[str] = None
     depth: int = 1
 
-@router.get("/")
+@router.get("/", tags=["Projects"])
 async def list_projects(
     page: int = 1,
     page_size: int = 10,
@@ -50,7 +50,7 @@ async def list_projects(
         # Return empty list if database has issues
         return {"code": 200, "data": {"items": [], "total": 0}}
 
-@router.post("/")
+@router.post("/", tags=["Projects"])
 async def create_project(
     request: CreateProjectRequest,
     db: Session = Depends(get_db),
@@ -68,7 +68,7 @@ async def create_project(
     )
     return {"code": 200, "data": project.to_dict()}
 
-@router.post("/import")
+@router.post("/import", tags=["Projects"])
 async def import_project(
     request: ImportProjectRequest,
     db: Session = Depends(get_db),
@@ -91,7 +91,7 @@ async def import_project(
     
     return {"code": 200, "data": project.to_dict()}
 
-@router.get("/{project_id}")
+@router.get("/{project_id}", tags=["Projects"])
 async def get_project(
     project_id: str,
     db: Session = Depends(get_db),
@@ -109,7 +109,7 @@ async def get_project(
     
     return {"code": 200, "data": project.to_dict()}
 
-@router.delete("/{project_id}")
+@router.delete("/{project_id}", tags=["Projects"])
 async def delete_project(
     project_id: str,
     db: Session = Depends(get_db),

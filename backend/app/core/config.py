@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+from pathlib import Path
 
 class Settings(BaseSettings):
     APP_NAME: str = "CodeInsight"
@@ -8,8 +9,8 @@ class Settings(BaseSettings):
     
     DATABASE_URL: str = "sqlite:///./data/codeinsight.db"
     
-    DATA_DIR: str = "./data"
-    PROJECTS_DIR: str = "./data/projects"
+    DATA_DIR: Path = Path("./data")
+    PROJECTS_DIR: Path = Path("./data/projects")
     CHROMA_DIR: str = "./data/chroma"
     
     OPENAI_API_KEY: str = ""

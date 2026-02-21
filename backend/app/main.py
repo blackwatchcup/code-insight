@@ -4,10 +4,15 @@ from typing import Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import projects, parser, auth, features
 from app.core.config import settings
 from app.core.init_db import init_db
 from app.core.websocket import manager
+
+from app.api.auth import router as auth_router
+from app.api.projects import router as projects_router
+from app.api.parser import router as parser_router
+from app.api.features import router as features_router
+from app.api.chat import router as chat_router
 
 
 @asynccontextmanager
@@ -29,10 +34,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router, prefix="/api/v1/auth")
-app.include_router(projects.router, prefix="/api/v1/projects")
-app.include_router(parser.router, prefix="/api/v1/parser")
-app.include_router(features.router, prefix="/api/v1/features")
+app.include_router(auth_router, prefix="/api/v1/auth")
+app.include_router(projects_router, prefix="/api/v1/projects")
+app.include_router(parser_router, prefix="/api/v1/parser")
+app.include_router(features_router, prefix="/api/v1/features")
+app.include_router(chat_router, prefix="/api/v1/chat")
 
 
 @app.get("/health")

@@ -32,7 +32,7 @@ class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     password: Optional[str] = None
 
-@router.post("/register", response_model=LoginResponse)
+@router.post("/register", response_model=LoginResponse, tags=["Auth"])
 async def register(
     data: UserRegister,
     db: Session = Depends(get_db)
@@ -63,7 +63,7 @@ async def register(
         )
     )
 
-@router.post("/login", response_model=LoginResponse)
+@router.post("/login", response_model=LoginResponse, tags=["Auth"])
 async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
@@ -90,7 +90,7 @@ async def login(
         )
     )
 
-@router.get("/me", response_model=UserResponse)
+@router.get("/me", response_model=UserResponse, tags=["Auth"])
 async def get_me(
     user: User = Depends(get_current_user_required)
 ):
@@ -103,7 +103,7 @@ async def get_me(
         is_active=user.is_active
     )
 
-@router.put("/me", response_model=UserResponse)
+@router.put("/me", response_model=UserResponse, tags=["Auth"])
 async def update_me(
     data: UserUpdate,
     user: User = Depends(get_current_user_required),
@@ -126,7 +126,7 @@ async def update_me(
         is_active=updated_user.is_active
     )
 
-@router.get("/users")
+@router.get("/users", tags=["Auth"])
 async def list_users(
     user: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
