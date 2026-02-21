@@ -29,7 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(projects.router, prefix="/api/projects")
+app.include_router(projects.router, prefix="/api/v1/projects")
 app.include_router(parser.router, prefix="/api/v1/parser")
 
 
