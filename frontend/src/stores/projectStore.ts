@@ -9,6 +9,7 @@ interface ProjectStore {
   isImporting: boolean
   
   fetchProjects: () => Promise<void>
+  fetchProject: (id: string) => Promise<Project>
   importProject: (data: ImportData) => Promise<void>
   deleteProject: (id: string) => Promise<void>
 }
@@ -28,6 +29,16 @@ export const useProjectStore = create<ProjectStore>((set) => ({
       set({ projects: items, isLoading: false })
     } catch (err: any) {
       set({ error: err.message, isLoading: false })
+    }
+  },
+  
+  fetchProject: async (id: string) => {
+    try {
+      const res = await api.get(`/projects/${id}`)
+      return res.data.data || res.data
+    } catch (err: any) {
+      set({ error: err.message })
+      throw err
     }
   },
   
