@@ -15,7 +15,8 @@ from app.parsers.base import (
 
 class PythonParser(BaseParser):
     def __init__(self):
-        self.parser = Parser(Language(tspython.language()))
+        self.parser = Parser()
+        self.parser.set_language(Language(tspython.language(), "python"))
 
     def get_language(self) -> str:
         return "python"

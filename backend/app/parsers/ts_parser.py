@@ -15,7 +15,8 @@ from app.parsers.base import (
 
 class TypeScriptParser(BaseParser):
     def __init__(self):
-        self.parser = Parser(Language(tstypescript.language_typescript()))
+        self.parser = Parser()
+        self.parser.set_language(Language(tstypescript.language_typescript(), "typescript"))
 
     def get_language(self) -> str:
         return "typescript"
