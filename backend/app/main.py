@@ -4,7 +4,7 @@ from typing import Dict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import projects
+from app.api import projects, parser
 from app.core.config import settings
 from app.core.init_db import init_db
 from app.core.websocket import manager
@@ -30,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(projects.router, prefix="/api/projects")
+app.include_router(parser.router, prefix="/api/v1/parser")
 
 
 @app.get("/health")
