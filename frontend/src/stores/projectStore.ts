@@ -23,7 +23,9 @@ export const useProjectStore = create<ProjectStore>((set) => ({
     set({ isLoading: true, error: null })
     try {
       const res = await api.get('/projects')
-      set({ projects: res.data.data.items, isLoading: false })
+      // Handle both response formats: {items: [...]} or {code: 200, data: {items: [...]}}
+      const items = res.data.items || res.data.data?.items || []
+      set({ projects: items, isLoading: false })
     } catch (err: any) {
       set({ error: err.message, isLoading: false })
     }
@@ -48,6 +50,10 @@ export const useProjectStore = create<ProjectStore>((set) => ({
         })
       }
       set({ isImporting: false })
+      // Refresh project list after import
+      const res = await api.get('/projects')
+      const items = res.data.items || res.data.data?.items || []
+      set({ projects: items })
     } catch (err: any) {
       set({ error: err.message, isImporting: false })
       throw err
@@ -57,9 +63,10 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   deleteProject: async (id: string) => {
     try {
       await api.delete(`/projects/${id}`)
-      set((state) => ({
-        projects: state.projects.filter((p) => p.id !== id)
-      }))
+      // Refresh project list after deletion
+      const res = await api.get('/projects')
+      const items = res.data.items || res.data.data?.items || []
+      set({ projects: items })
     } catch (err: any) {
       set({ error: err.message })
     }
