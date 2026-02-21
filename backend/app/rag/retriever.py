@@ -37,7 +37,15 @@ class SemanticRetriever:
         project_id: Optional[str] = None
     ) -> List[RetrievalResult]:
         top_k = top_k or self.default_top_k
-        query_embedding = self.embedder.embed(query)
+        
+        if self.store.count() == 0:
+            return []
+        
+        try:
+            query_embedding = self.embedder.embed(query)
+        except Exception as e:
+            print(f"Warning: Embedding failed: {e}")
+            return []
         
         where_filter = None
         if project_id:
@@ -73,7 +81,15 @@ class SemanticRetriever:
         project_id: Optional[str] = None
     ) -> List[RetrievalResult]:
         top_k = top_k or self.default_top_k
-        code_embedding = self.embedder.embed(code)
+        
+        if self.store.count() == 0:
+            return []
+        
+        try:
+            code_embedding = self.embedder.embed(code)
+        except Exception as e:
+            print(f"Warning: Embedding failed: {e}")
+            return []
         
         where_filter = None
         if project_id:
