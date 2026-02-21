@@ -1,35 +1,102 @@
 import requests
+import json
 
-base_url = "http://localhost:8000"
-
-def test_health():
-    response = requests.get(f"{base_url}/health")
-    print(f"Health check: {response.status_code} - {response.json()}")
-
-def test_list_projects():
-    response = requests.get(f"{base_url}/api/v1/projects/")
-    print(f"List projects: {response.status_code} - {response.text}")
-
-def test_create_project():
+# Test registration endpoint
+def test_register():
+    url = "http://localhost:8000/api/v1/auth/register"
+    headers = {"Content-Type": "application/json"}
     data = {
-        "name": "test_project",
-        "source_type": "local",
-        "local_path": "C:\\Users\\Alan ZA Zhang\\Desktop\\test"
+        "username": "testuserapi",
+        "email": "testapi@example.com",
+        "password": "password123"
     }
-    response = requests.post(f"{base_url}/api/v1/projects/", json=data)
-    print(f"Create project: {response.status_code} - {response.text}")
+    
+    print("Testing registration endpoint...")
+    print(f"URL: {url}")
+    print(f"Data: {json.dumps(data, indent=2)}")
+    
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        print(f"Status code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 200:
+            print("✓ Registration successful!")
+            return response.json()
+        else:
+            print(f"✗ Registration failed with status code: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"✗ Error: {str(e)}")
+        return None
 
-def test_get_project(project_id):
-    response = requests.get(f"{base_url}/api/v1/projects/{project_id}")
-    print(f"Get project: {response.status_code} - {response.text}")
+# Test login endpoint
+def test_login(username, password):
+    url = "http://localhost:8000/api/v1/auth/login"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    data = {
+        "username": username,
+        "password": password
+    }
+    
+    print("\nTesting login endpoint...")
+    print(f"URL: {url}")
+    
+    try:
+        response = requests.post(url, headers=headers, data=data)
+        print(f"Status code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 200:
+            print("✓ Login successful!")
+            return response.json()
+        else:
+            print(f"✗ Login failed with status code: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"✗ Error: {str(e)}")
+        return None
 
-def test_delete_project(project_id):
-    response = requests.delete(f"{base_url}/api/v1/projects/{project_id}")
-    print(f"Delete project: {response.status_code} - {response.text}")
+# Test me endpoint
+def test_me(access_token):
+    url = "http://localhost:8000/api/v1/auth/me"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {access_token}"
+    }
+    
+    print("\nTesting me endpoint...")
+    print(f"URL: {url}")
+    
+    try:
+        response = requests.get(url, headers=headers)
+        print(f"Status code: {response.status_code}")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+        
+        if response.status_code == 200:
+            print("✓ Me endpoint successful!")
+            return response.json()
+        else:
+            print(f"✗ Me endpoint failed with status code: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"✗ Error: {str(e)}")
+        return None
 
 if __name__ == "__main__":
-    test_health()
-    test_list_projects()
-    test_create_project()
-    test_get_project(1)
-    test_delete_project(1)
+    print("=== Testing API Endpoints ===")
+    
+    # Test registration
+    register_response = test_register()
+    
+    if register_response:
+        # Test login with the same credentials
+        login_response = test_login("testuserapi", "password123")
+        
+        if login_response:
+            # Test me endpoint with the access token
+            access_token = login_response.get("access_token")
+            if access_token:
+                test_me(access_token)
+    
+    print("\n=== Test completed ===")
