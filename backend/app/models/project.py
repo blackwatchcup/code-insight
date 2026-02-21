@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Integer, Enum
+from sqlalchemy import Column, String, DateTime, Integer, Enum, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -26,6 +26,7 @@ class Project(Base):
     
     id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
+    owner_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
     source_type = Column(Enum(SourceType), default=SourceType.LOCAL)
     source_url = Column(String, nullable=True)
     local_path = Column(String, nullable=False)
@@ -37,6 +38,7 @@ class Project(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
     
     # Relationships
+    owner = relationship("User", back_populates="projects")
     files = relationship("File", back_populates="project", cascade="all, delete-orphan")
     chats = relationship("Chat", back_populates="project", cascade="all, delete-orphan")
     features = relationship("Feature", back_populates="project", cascade="all, delete-orphan")
@@ -46,6 +48,7 @@ class Project(Base):
         return {
             "id": self.id,
             "name": self.name,
+            "owner_id": self.owner_id,
             "source_type": self.source_type.value if self.source_type else None,
             "source_url": self.source_url,
             "local_path": self.local_path,

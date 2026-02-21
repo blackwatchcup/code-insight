@@ -2,7 +2,7 @@ import os
 import shutil
 import uuid
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 from sqlalchemy.orm import Session
 from app.models.project import Project, SourceType, ProjectStatus
 from app.core.config import settings
@@ -11,7 +11,12 @@ class ProjectService:
     def __init__(self, db: Session):
         self.db = db
     
-    async def create_from_local(self, name: str, local_path: str) -> Project:
+    async def create_from_local(
+        self,
+        name: str,
+        local_path: str,
+        owner_id: Optional[str] = None
+    ) -> Project:
         if not os.path.exists(local_path):
             raise ValueError(f"Local path does not exist: {local_path}")
         
@@ -31,6 +36,7 @@ class ProjectService:
         project = Project(
             id=project_id,
             name=name,
+            owner_id=owner_id,
             source_type=SourceType.LOCAL,
             source_url=local_path,
             local_path=str(project_dir),
@@ -72,6 +78,20 @@ class ProjectService:
     
     def list_projects(self, page: int = 1, page_size: int = 10) -> Tuple[list, int]:
         query = self.db.query(Project).order_by(Project.created_at.desc())
+        total = query.count()
+        offset = (page - 1) * page_size
+        projects = query.offset(offset).limit(page_size).all()
+        return projects, total
+    
+    def list_projects_by_owner(
+        self,
+        owner_id: str,
+        page: int = 1,
+        page_size: int = 10
+    ) -> Tuple[list, int]:
+        query = self.db.query(Project).filter(
+            Project.owner_id == owner_id
+        ).order_by(Project.created_at.desc())
         total = query.count()
         offset = (page - 1) * page_size
         projects = query.offset(offset).limit(page_size).all()

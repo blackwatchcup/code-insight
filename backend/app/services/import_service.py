@@ -20,7 +20,8 @@ class ImportService:
         branch: str = "main",
         token: Optional[str] = None,
         depth: int = 1,
-        name: Optional[str] = None
+        name: Optional[str] = None,
+        owner_id: Optional[str] = None
     ) -> Project:
         project_id = str(uuid.uuid4())[:8]
         projects_dir = Path(settings.PROJECTS_DIR)
@@ -45,6 +46,7 @@ class ImportService:
         project = Project(
             id=project_id,
             name=name,
+            owner_id=owner_id,
             source_type=self._detect_source_type(url),
             source_url=url,
             local_path=str(project_dir),
@@ -60,7 +62,12 @@ class ImportService:
         
         return project
     
-    async def import_from_zip(self, url: str, name: Optional[str] = None) -> Project:
+    async def import_from_zip(
+        self,
+        url: str,
+        name: Optional[str] = None,
+        owner_id: Optional[str] = None
+    ) -> Project:
         project_id = str(uuid.uuid4())[:8]
         projects_dir = Path(settings.PROJECTS_DIR)
         projects_dir.mkdir(parents=True, exist_ok=True)
@@ -87,6 +94,7 @@ class ImportService:
             project = Project(
                 id=project_id,
                 name=name,
+                owner_id=owner_id,
                 source_type=SourceType.ZIP,
                 source_url=url,
                 local_path=str(project_dir),

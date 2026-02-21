@@ -3,6 +3,7 @@ from app.models.project import Project, SourceType, ProjectStatus
 from app.models.file import File
 from app.models.chat import Chat
 from app.models.feature import Feature
+from app.models.user import User, UserRole
 
 __all__ = [
     "Base",
@@ -11,5 +12,7 @@ __all__ = [
     "ProjectStatus",
     "File",
     "Chat",
-    "Feature"
+    "Feature",
+    "User",
+    "UserRole"
 ]
