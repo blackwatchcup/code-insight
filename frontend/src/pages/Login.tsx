@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 
 export default function LoginPage() {
+  const navigate = useNavigate()
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -13,7 +15,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
+
     try {
       if (mode === 'login') {
         await login(username, password)
@@ -24,6 +26,8 @@ export default function LoginPage() {
         }
         await register(username, email, password)
       }
+      // Navigate to main page after successful auth
+      navigate('/')
     } catch (err: any) {
       const msg = err.response?.data?.detail || '操作失败，请重试'
       setError(msg)
