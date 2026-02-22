@@ -18,8 +18,10 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.deepseek.com"
     CLAUDE_API_KEY: str = ""
     
-    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_MODEL: str = "local"
     EMBEDDING_BASE_URL: Optional[str] = None
+    EMBEDDING_USE_LOCAL: bool = True
+    EMBEDDING_DIM: int = 384
     CHUNK_SIZE: int = 500
     CHUNK_OVERLAP: int = 50
     

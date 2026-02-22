@@ -24,7 +24,9 @@ class RAGService:
         self.embedding_config = embedding_config or EmbeddingConfig(
             api_key=settings.OPENAI_API_KEY,
             base_url=settings.EMBEDDING_BASE_URL,
-            model_name=settings.EMBEDDING_MODEL
+            model_name=settings.EMBEDDING_MODEL,
+            use_local=settings.EMBEDDING_USE_LOCAL,
+            embedding_dim=settings.EMBEDDING_DIM
         )
         self.vector_store_config = vector_store_config or VectorStoreConfig(
             persist_directory=settings.CHROMA_DIR
