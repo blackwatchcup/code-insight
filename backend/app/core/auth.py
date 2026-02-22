@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import hashlib
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -19,13 +20,23 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=F
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password."""
     try:
+        # Apply same truncation logic as get_password_hash for consistency
+        password_bytes = plain_password.encode('utf-8')
+        if len(password_bytes) > 72:
+            truncated_bytes = password_bytes[:72]
+            plain_password = truncated_bytes.decode('utf-8', errors='ignore')
         return pwd_context.verify(plain_password, hashed_password)
     except Exception:
         return False
 
 def get_password_hash(password: str) -> str:
-    truncated = password[:72] if len(password.encode('utf-8')) > 72 else password
-    return pwd_context.hash(truncated)
+    """Hash password with bcrypt, truncating to 72 bytes if needed."""
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        truncated_bytes = password_bytes[:72]
+        truncated = truncated_bytes.decode('utf-8', errors='ignore')
+        return pwd_context.hash(truncated)
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
