@@ -122,10 +122,10 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
 
         {activeTab === 'frontend' && (
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">前端功能 ({frontendFeatures.length})</h3>
-            {frontendFeatures.length > 0 ? (
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">前端功能 ({frontendFeatures?.length || 0})</h3>
+            {frontendFeatures && frontendFeatures.length > 0 ? (
               <div className="space-y-3">
-                {frontendFeatures.map((feature) => (
+                {(frontendFeatures || []).map((feature) => (
                   <div
                     key={feature.id}
                     className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
@@ -149,10 +149,10 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
 
         {activeTab === 'backend' && (
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">后端功能 ({backendFeatures.length})</h3>
-            {backendFeatures.length > 0 ? (
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">后端功能 ({backendFeatures?.length || 0})</h3>
+            {backendFeatures && backendFeatures.length > 0 ? (
               <div className="space-y-3">
-                {backendFeatures.map((feature) => (
+                {(backendFeatures || []).map((feature) => (
                   <div
                     key={feature.id}
                     className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
@@ -176,8 +176,8 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
 
         {activeTab === 'apis' && (
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">API端点 ({apiEndpoints.length})</h3>
-            {apiEndpoints.length > 0 ? (
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">API端点 ({apiEndpoints?.length || 0})</h3>
+            {apiEndpoints && apiEndpoints.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -188,7 +188,7 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
                     </tr>
                   </thead>
                   <tbody>
-                    {apiEndpoints.map((api, idx) => (
+                    {(apiEndpoints || []).map((api, idx) => (
                       <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -216,10 +216,10 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
 
         {activeTab === 'models' && (
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">数据模型 ({dataModels.length})</h3>
-            {dataModels.length > 0 ? (
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">数据模型 ({dataModels?.length || 0})</h3>
+            {dataModels && dataModels.length > 0 ? (
               <div className="grid gap-4">
-                {dataModels.map((model, idx) => (
+                {(dataModels || []).map((model, idx) => (
                   <div key={idx} className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                     <div className="flex items-center gap-2 mb-2">
                       <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -229,7 +229,7 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
                       <span className="text-xs text-gray-500 ml-auto">{model.file_path}</span>
                     </div>
                     <div className="space-y-1">
-                      {model.fields.map((field, fieldIdx) => (
+                      {(model.fields || []).map((field, fieldIdx) => (
                         <div key={fieldIdx} className="flex items-center gap-2 text-sm pl-7">
                           <span className="text-gray-900">{field.name}</span>
                           <span className="text-blue-600 text-xs">{field.type}</span>

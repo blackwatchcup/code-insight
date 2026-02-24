@@ -131,7 +131,7 @@ export default function Chat() {
             className="flex-1 max-w-md px-3 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
           >
             <option value="">所有项目</option>
-            {projects.map((project) => (
+            {(projects || []).map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
               </option>

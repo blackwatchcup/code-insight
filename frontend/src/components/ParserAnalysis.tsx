@@ -199,13 +199,13 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">项目文件结构</h3>
               <div className="flex gap-4 text-sm text-gray-600">
-                <span>文件: {structure.summary.total_files}</span>
-                <span>函数: {structure.summary.total_functions}</span>
-                <span>类: {structure.summary.total_classes}</span>
+                <span>文件: {structure.summary?.total_files || 0}</span>
+                <span>函数: {structure.summary?.total_functions || 0}</span>
+                <span>类: {structure.summary?.total_classes || 0}</span>
               </div>
             </div>
             <div className="bg-gray-50 rounded-xl p-4 overflow-auto max-h-96">
-              {structure.files.length > 0 ? renderFileStructure(structure.files) : (
+              {(structure.files?.length || 0) > 0 ? renderFileStructure(structure.files || []) : (
                 <div className="text-center py-8 text-gray-500">暂无文件结构数据</div>
               )}
             </div>
@@ -217,24 +217,24 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">函数调用关系</h3>
               <div className="flex gap-4 text-sm text-gray-600">
-                <span>节点: {callGraph.nodes.length}</span>
-                <span>边: {callGraph.edges.length}</span>
-                <span>入口点: {callGraph.entry_points.length}</span>
+                <span>节点: {callGraph.nodes?.length || 0}</span>
+                <span>边: {callGraph.edges?.length || 0}</span>
+                <span>入口点: {callGraph.entry_points?.length || 0}</span>
               </div>
             </div>
             <div className="grid gap-4">
                <div className="bg-gray-50 rounded-xl p-4">
-                 <h4 className="text-sm font-semibold text-gray-900 mb-3">入口函数 ({callGraph.entry_points.length})</h4>
-                 {callGraph.entry_points.length > 0 ? (
+                 <h4 className="text-sm font-semibold text-gray-900 mb-3">入口函数 ({callGraph.entry_points?.length || 0})</h4>
+                 {(callGraph.entry_points?.length || 0) > 0 ? (
                    <div className="flex flex-wrap gap-2">
-                     {callGraph.entry_points.slice(0, 20).map((entry, idx) => (
+                     {(callGraph.entry_points || []).slice(0, 20).map((entry, idx) => (
                        <span key={idx} className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors" title={entry}>
                          {entry}
                        </span>
                      ))}
-                     {callGraph.entry_points.length > 20 && (
+                     {(callGraph.entry_points?.length || 0) > 20 && (
                        <div className="text-xs text-gray-500 self-center py-1.5">
-                         ... 还有 {callGraph.entry_points.length - 20} 个入口点
+                         ... 还有 {(callGraph.entry_points?.length || 0) - 20} 个入口点
                        </div>
                      )}
                    </div>
@@ -244,14 +244,14 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
                </div>
                <div className="bg-gray-50 rounded-xl p-4">
                  <h4 className="text-sm font-semibold text-gray-900 mb-3">函数节点</h4>
-                 {callGraph.nodes.length > 0 ? (
+                 {(callGraph.nodes?.length || 0) > 0 ? (
                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-auto">
-                     {callGraph.nodes.slice(0, 50).map((node, idx) => {
-                       const isEntryPoint = callGraph.entry_points.includes(node.id || node.name)
-                       const edgeCount = callGraph.edges.filter(
+                     {(callGraph.nodes || []).slice(0, 50).map((node, idx) => {
+                       const isEntryPoint = (callGraph.entry_points || []).includes(node.id || node.name)
+                       const edgeCount = (callGraph.edges || []).filter(
                          (e: any) => e.source === (node.id || node.name)
                        ).length
-                       
+                        
                        return (
                          <div 
                            key={idx} 
@@ -281,23 +281,23 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">依赖关系分析</h3>
               <div className="flex gap-4 text-sm text-gray-600">
-                <span>内部模块: {dependencies.internal_modules.length}</span>
-                <span>外部依赖: {dependencies.external_modules.length}</span>
+                <span>内部模块: {dependencies.internal_modules?.length || 0}</span>
+                <span>外部依赖: {dependencies.external_modules?.length || 0}</span>
               </div>
             </div>
             <div className="grid gap-4">
               <div className="bg-gray-50 rounded-xl p-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">内部模块 ({dependencies.internal_modules.length})</h4>
-                {dependencies.internal_modules.length > 0 ? (
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">内部模块 ({dependencies.internal_modules?.length || 0})</h4>
+                {(dependencies.internal_modules?.length || 0) > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {dependencies.internal_modules.slice(0, 20).map((mod, idx) => (
+                    {(dependencies.internal_modules || []).slice(0, 20).map((mod, idx) => (
                       <span key={idx} className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors" title={`模块: ${mod}`}>
                         {mod}
                       </span>
                     ))}
-                    {dependencies.internal_modules.length > 20 && (
+                    {(dependencies.internal_modules?.length || 0) > 20 && (
                       <div className="text-xs text-gray-500 self-center py-1.5">
-                        ... 还有 {dependencies.internal_modules.length - 20} 个模块
+                        ... 还有 {(dependencies.internal_modules?.length || 0) - 20} 个模块
                       </div>
                     )}
                   </div>
@@ -306,17 +306,17 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
                 )}
               </div>
               <div className="bg-gray-50 rounded-xl p-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">外部依赖 ({dependencies.external_modules.length})</h4>
-                {dependencies.external_modules.length > 0 ? (
+                <h4 className="text-sm font-semibold text-gray-900 mb-3">外部依赖 ({dependencies.external_modules?.length || 0})</h4>
+                {(dependencies.external_modules?.length || 0) > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {dependencies.external_modules.slice(0, 20).map((dep, idx) => (
+                    {(dependencies.external_modules || []).slice(0, 20).map((dep, idx) => (
                       <span key={idx} className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors" title={`依赖: ${dep}`}>
                         {dep}
                       </span>
                     ))}
-                    {dependencies.external_modules.length > 20 && (
+                    {(dependencies.external_modules?.length || 0) > 20 && (
                       <div className="text-xs text-gray-500 self-center py-1.5">
-                        ... 还有 {dependencies.external_modules.length - 20} 个依赖
+                        ... 还有 {(dependencies.external_modules?.length || 0) - 20} 个依赖
                       </div>
                     )}
                   </div>

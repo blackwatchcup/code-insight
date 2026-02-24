@@ -78,7 +78,7 @@ export default function Projects() {
           </div>
           <p className="mt-4 text-gray-500 text-sm">加载项目中...</p>
         </div>
-      ) : projects.length === 0 ? (
+      ) : !projects || projects.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
             <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,10 +105,10 @@ export default function Projects() {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <span>共 {projects.length} 个项目</span>
+            <span>共 {projects?.length || 0} 个项目</span>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {projects.map((project) => (
+            {(projects || []).map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}
