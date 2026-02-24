@@ -1,4 +1,5 @@
-from typing import Dict, Type, Optional, List
+from typing import Dict, List, Optional, Type
+
 from app.parsers.base import BaseParser
 
 
@@ -7,7 +8,9 @@ class ParserFactory:
     _extension_map: Dict[str, str] = {}
 
     @classmethod
-    def register(cls, language: str, parser_class: Type[BaseParser], extensions: Optional[List[str]] = None):
+    def register(
+        cls, language: str, parser_class: Type[BaseParser], extensions: Optional[List[str]] = None
+    ):
         cls._parsers[language] = parser_class
         if extensions:
             for ext in extensions:

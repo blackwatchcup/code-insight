@@ -1,5 +1,13 @@
-from app.graph.call_graph import CallGraphBuilder, CallGraph, CallNode, CallEdge
-from app.graph.dependency_graph import DependencyAnalyzer, DependencyGraph, ModuleNode, DependencyEdge
+from app.graph.arch_generator import ArchGenerator
+from app.graph.call_graph import CallEdge, CallGraph, CallGraphBuilder, CallNode
+from app.graph.call_graph_visualizer import CallGraphVisualizer
+from app.graph.dependency_graph import (
+    DependencyAnalyzer,
+    DependencyEdge,
+    DependencyGraph,
+    ModuleNode,
+)
+from app.graph.flow_generator import FlowGenerator
 
 __all__ = [
     "CallGraphBuilder",
@@ -10,4 +18,7 @@ __all__ = [
     "DependencyGraph",
     "ModuleNode",
     "DependencyEdge",
+    "FlowGenerator",
+    "ArchGenerator",
+    "CallGraphVisualizer",
 ]

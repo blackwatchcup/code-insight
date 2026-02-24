@@ -1,8 +1,8 @@
 from app.core.database import Base
-from app.models.project import Project, SourceType, ProjectStatus
-from app.models.file import File
 from app.models.chat import Chat
 from app.models.feature import Feature
+from app.models.file import File
+from app.models.project import Project, ProjectStatus, SourceType
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -14,5 +14,5 @@ __all__ = [
     "Chat",
     "Feature",
     "User",
-    "UserRole"
+    "UserRole",
 ]

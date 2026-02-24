@@ -1,8 +1,11 @@
-from sqlalchemy import Column, String, DateTime, Integer, Enum, ForeignKey
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
-from app.core.database import Base
 import enum
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
+from app.core.database import Base
+
 
 class SourceType(str, enum.Enum):
     LOCAL = "local"
@@ -11,6 +14,7 @@ class SourceType(str, enum.Enum):
     GITEE = "gitee"
     GIT = "git"
     ZIP = "zip"
+
 
 class ProjectStatus(str, enum.Enum):
     PENDING = "pending"
@@ -21,9 +25,10 @@ class ProjectStatus(str, enum.Enum):
     ERROR = "error"
     FAILED = "failed"
 
+
 class Project(Base):
     __tablename__ = "projects"
-    
+
     id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
     owner_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
@@ -36,13 +41,13 @@ class Project(Base):
     line_count = Column(Integer, default=0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
+
     # Relationships
     owner = relationship("User", back_populates="projects")
     files = relationship("File", back_populates="project", cascade="all, delete-orphan")
     chats = relationship("Chat", back_populates="project", cascade="all, delete-orphan")
     features = relationship("Feature", back_populates="project", cascade="all, delete-orphan")
-    
+
     def to_dict(self):
         """Convert project to dictionary for JSON serialization"""
         return {
@@ -57,5 +62,5 @@ class Project(Base):
             "file_count": self.file_count,
             "line_count": self.line_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

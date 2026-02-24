@@ -1,8 +1,8 @@
-from dataclasses import dataclass, field
-from typing import Dict, List, Set, Optional
 from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set
 
-from app.parsers.base import ParseResult, FunctionInfo, ClassInfo
+from app.parsers.base import ClassInfo, FunctionInfo, ParseResult
 
 
 @dataclass(frozen=True)
@@ -220,10 +220,12 @@ class CallGraphBuilder:
             visited.add(fid)
 
             for caller_id in self._callers.get(fid, set()):
-                chain["callers"].append({
-                    "id": caller_id,
-                    "depth": current_depth,
-                })
+                chain["callers"].append(
+                    {
+                        "id": caller_id,
+                        "depth": current_depth,
+                    }
+                )
                 traverse_callers(caller_id, current_depth + 1)
 
         def traverse_callees(fid: str, current_depth: int):
@@ -232,10 +234,12 @@ class CallGraphBuilder:
             visited.add(fid)
 
             for callee_id in self._callees.get(fid, set()):
-                chain["callees"].append({
-                    "id": callee_id,
-                    "depth": current_depth,
-                })
+                chain["callees"].append(
+                    {
+                        "id": callee_id,
+                        "depth": current_depth,
+                    }
+                )
                 traverse_callees(callee_id, current_depth + 1)
 
         visited.clear()

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Optional, Callable, Awaitable
 from enum import Enum
+from typing import Awaitable, Callable, Optional
 
 from app.core.websocket import manager
 

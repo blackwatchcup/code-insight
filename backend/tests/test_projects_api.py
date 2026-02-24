@@ -36,7 +36,7 @@ def db_session(db_engine):
 def client(db_session):
     def override_get_db():
         yield db_session
-    
+
     app.dependency_overrides[get_db] = override_get_db
     yield TestClient(app)
     app.dependency_overrides.clear()
@@ -56,7 +56,7 @@ class TestCreateProjectAPI:
             "/api/v1/projects/",
             json={"name": "Test Project", "source_type": "local", "local_path": sample_project_dir},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
@@ -70,7 +70,7 @@ class TestCreateProjectAPI:
             "/api/v1/projects/",
             json={"name": "Test", "source_type": "local", "local_path": "/nonexistent"},
         )
-        
+
         assert response.status_code == 400
 
     def test_create_project_empty_name(self, client: TestClient, sample_project_dir: str):
@@ -78,7 +78,7 @@ class TestCreateProjectAPI:
             "/api/v1/projects/",
             json={"name": "", "source_type": "local", "local_path": sample_project_dir},
         )
-        
+
         assert response.status_code == 422
 
     def test_create_project_empty_path(self, client: TestClient):
@@ -86,7 +86,7 @@ class TestCreateProjectAPI:
             "/api/v1/projects/",
             json={"name": "Test", "source_type": "local", "local_path": ""},
         )
-        
+
         assert response.status_code == 422
 
     def test_create_project_unsupported_source_type(self, client: TestClient):
@@ -94,14 +94,14 @@ class TestCreateProjectAPI:
             "/api/v1/projects/",
             json={"name": "Test", "source_type": "github", "local_path": "/some/path"},
         )
-        
+
         assert response.status_code == 400
 
 
 class TestListProjectsAPI:
     def test_list_projects_empty(self, client: TestClient):
         response = client.get("/api/v1/projects/")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
@@ -112,9 +112,9 @@ class TestListProjectsAPI:
             "/api/v1/projects/",
             json={"name": "Project 1", "source_type": "local", "local_path": sample_project_dir},
         )
-        
+
         response = client.get("/api/v1/projects/")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert len(data["data"]) == 1
@@ -128,9 +128,9 @@ class TestGetProjectAPI:
             json={"name": "Test", "source_type": "local", "local_path": sample_project_dir},
         )
         project_id = create_response.json()["data"]["id"]
-        
+
         response = client.get(f"/api/v1/projects/{project_id}")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["code"] == 200
@@ -138,7 +138,7 @@ class TestGetProjectAPI:
 
     def test_get_project_not_found(self, client: TestClient):
         response = client.get("/api/v1/projects/99999")
-        
+
         assert response.status_code == 404
 
 
@@ -149,13 +149,13 @@ class TestDeleteProjectAPI:
             json={"name": "Test", "source_type": "local", "local_path": sample_project_dir},
         )
         project_id = create_response.json()["data"]["id"]
-        
+
         response = client.delete(f"/api/v1/projects/{project_id}")
-        
+
         assert response.status_code == 200
         assert response.json()["data"]["deleted"] is True
 
     def test_delete_project_not_found(self, client: TestClient):
         response = client.delete("/api/v1/projects/99999")
-        
+
         assert response.status_code == 404

@@ -1,10 +1,6 @@
 import pytest
-from app.parsers import (
-    ParserFactory,
-    PythonParser,
-    JavaScriptParser,
-    TypeScriptParser,
-)
+
+from app.parsers import JavaScriptParser, ParserFactory, PythonParser, TypeScriptParser
 
 
 class TestParserFactory:
@@ -86,11 +82,11 @@ class Calculator:
         assert result.classes[0].methods[1].name == "add"
 
     def test_parse_imports(self, parser):
-        code = '''
+        code = """
 import os
 from typing import List, Dict
 from collections import defaultdict as dd
-'''
+"""
         result = parser.parse(code, "test.py")
 
         assert len(result.imports) == 3
@@ -100,12 +96,12 @@ from collections import defaultdict as dd
         assert "Dict" in result.imports[1].names
 
     def test_parse_decorated_function(self, parser):
-        code = '''
+        code = """
 @app.route("/api")
 @cache.memoize(timeout=60)
 def get_data():
     return {"data": "value"}
-'''
+"""
         result = parser.parse(code, "test.py")
 
         assert len(result.functions) == 1
@@ -134,11 +130,11 @@ class TestJavaScriptParser:
         return JavaScriptParser()
 
     def test_parse_function(self, parser):
-        code = '''
+        code = """
 function greet(name) {
     return `Hello, ${name}!`;
 }
-'''
+"""
         result = parser.parse(code, "test.js")
 
         assert result.language == "javascript"
@@ -146,18 +142,18 @@ function greet(name) {
         assert result.functions[0].name == "greet"
 
     def test_parse_arrow_function(self, parser):
-        code = '''
+        code = """
 const add = (a, b) => a + b;
 const multiply = (a, b) => {
     return a * b;
 };
-'''
+"""
         result = parser.parse(code, "test.js")
 
         assert len(result.functions) >= 1
 
     def test_parse_class(self, parser):
-        code = '''
+        code = """
 class Person {
     constructor(name) {
         this.name = name;
@@ -167,7 +163,7 @@ class Person {
         return `Hello, ${this.name}`;
     }
 }
-'''
+"""
         result = parser.parse(code, "test.js")
 
         assert len(result.classes) == 1
@@ -175,11 +171,11 @@ class Person {
         assert len(result.classes[0].methods) >= 1
 
     def test_parse_imports(self, parser):
-        code = '''
+        code = """
 import React from 'react';
 import { useState, useEffect } from 'react';
 import * as utils from './utils';
-'''
+"""
         result = parser.parse(code, "test.js")
 
         assert len(result.imports) >= 1
@@ -191,11 +187,11 @@ class TestTypeScriptParser:
         return TypeScriptParser()
 
     def test_parse_function_with_types(self, parser):
-        code = '''
+        code = """
 function add(a: number, b: number): number {
     return a + b;
 }
-'''
+"""
         result = parser.parse(code, "test.ts")
 
         assert result.language == "typescript"
@@ -204,20 +200,20 @@ function add(a: number, b: number): number {
         assert result.functions[0].return_type == "number"
 
     def test_parse_interface(self, parser):
-        code = '''
+        code = """
 interface User {
     id: number;
     name: string;
     email?: string;
 }
-'''
+"""
         result = parser.parse(code, "test.ts")
 
         assert len(result.classes) >= 1
         assert result.classes[0].name == "User"
 
     def test_parse_class_with_types(self, parser):
-        code = '''
+        code = """
 class Calculator {
     private value: number;
     
@@ -229,7 +225,7 @@ class Calculator {
         return this.value + x;
     }
 }
-'''
+"""
         result = parser.parse(code, "test.ts")
 
         assert len(result.classes) == 1

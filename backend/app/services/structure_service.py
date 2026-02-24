@@ -1,11 +1,11 @@
-import os
 import asyncio
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from app.parsers.factory import ParserFactory
 from app.parsers.base import ParseResult
+from app.parsers.factory import ParserFactory
 
 
 @dataclass
@@ -113,10 +113,12 @@ class StructureService:
             files.append(result)
 
             if result.error:
-                summary.errors.append({
-                    "file": str(file_path),
-                    "error": result.error,
-                })
+                summary.errors.append(
+                    {
+                        "file": str(file_path),
+                        "error": result.error,
+                    }
+                )
             else:
                 summary.total_functions += len(result.functions)
                 summary.total_classes += len(result.classes)

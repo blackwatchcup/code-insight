@@ -1,13 +1,14 @@
-import pytest
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
 import sys
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-sys.modules['chromadb'] = MagicMock()
+import pytest
 
-from app.rag.embedder import CodeEmbedder, EmbeddingConfig, CodeChunk
+sys.modules["chromadb"] = MagicMock()
+
 from app.rag.chat_history import ChatHistoryManager, ChatMessage
-from app.rag.citation import CitationExtractor, Citation
-from app.rag.qa_service import QAService, QAResponse, QAType
+from app.rag.citation import Citation, CitationExtractor
+from app.rag.embedder import CodeChunk, CodeEmbedder, EmbeddingConfig
+from app.rag.qa_service import QAResponse, QAService, QAType
 
 
 class TestCodeEmbedder:
@@ -19,19 +20,15 @@ class TestCodeEmbedder:
     def test_embed_single_code(self):
         embedder = CodeEmbedder(EmbeddingConfig())
         code = "def hello():\n    print('hello')"
-        with patch.object(embedder, '_get_embedding', return_value=[0.1] * 1536):
+        with patch.object(embedder, "_get_embedding", return_value=[0.1] * 1536):
             embedding = embedder.embed(code)
             assert len(embedding) == 1536
             assert all(x == 0.1 for x in embedding)
 
     def test_embed_batch_codes(self):
         embedder = CodeEmbedder(EmbeddingConfig())
-        codes = [
-            "def func1(): pass",
-            "def func2(): pass",
-            "class MyClass: pass"
-        ]
-        with patch.object(embedder, '_get_embedding', return_value=[0.1] * 1536):
+        codes = ["def func1(): pass", "def func2(): pass", "class MyClass: pass"]
+        with patch.object(embedder, "_get_embedding", return_value=[0.1] * 1536):
             embeddings = embedder.embed_batch(codes)
             assert len(embeddings) == 3
             assert all(len(e) == 1536 for e in embeddings)
@@ -54,15 +51,18 @@ class TestCodeEmbedder:
 class TestChromaStore:
     def test_store_initialization(self):
         from app.rag.vector_store import VectorStoreConfig
+
         config = VectorStoreConfig(persist_directory="./test_chroma")
         assert config.persist_directory == "./test_chroma"
 
     def test_add_documents_interface(self):
         from app.rag.vector_store import VectorStoreConfig
+
         assert VectorStoreConfig is not None
 
     def test_query_interface(self):
         from app.rag.vector_store import VectorStoreConfig
+
         config = VectorStoreConfig()
         assert config.collection_name == "code_embeddings"
 
@@ -70,6 +70,7 @@ class TestChromaStore:
 class TestSemanticRetriever:
     def test_retriever_initialization(self):
         from app.rag.retriever import SemanticRetriever
+
         embedder = Mock(spec=CodeEmbedder)
         store = Mock()
         retriever = SemanticRetriever(embedder, store)
@@ -77,7 +78,8 @@ class TestSemanticRetriever:
         assert retriever.store == store
 
     def test_retrieve_relevant_code(self):
-        from app.rag.retriever import SemanticRetriever, RetrievalResult
+        from app.rag.retriever import RetrievalResult, SemanticRetriever
+
         embedder = Mock(spec=CodeEmbedder)
         embedder.embed.return_value = [0.1] * 1536
         store = Mock()
@@ -85,7 +87,7 @@ class TestSemanticRetriever:
             "ids": [["1", "2"]],
             "documents": [["def hello(): pass", "class Test: pass"]],
             "metadatas": [[{"file": "test.py", "line": 1}, {"file": "test.py", "line": 5}]],
-            "distances": [[0.1, 0.2]]
+            "distances": [[0.1, 0.2]],
         }
         retriever = SemanticRetriever(embedder, store)
         results = retriever.retrieve("how to say hello", top_k=2)
@@ -94,6 +96,7 @@ class TestSemanticRetriever:
 
     def test_retrieve_with_threshold(self):
         from app.rag.retriever import SemanticRetriever
+
         embedder = Mock(spec=CodeEmbedder)
         embedder.embed.return_value = [0.1] * 1536
         store = Mock()
@@ -101,7 +104,7 @@ class TestSemanticRetriever:
             "ids": [["1", "2"]],
             "documents": [["def hello(): pass", "class Test: pass"]],
             "metadatas": [[{"file": "test.py"}, {"file": "test.py"}]],
-            "distances": [[0.1, 0.9]]
+            "distances": [[0.1, 0.9]],
         }
         retriever = SemanticRetriever(embedder, store)
         results = retriever.retrieve("query", top_k=2, threshold=0.5)
@@ -110,20 +113,27 @@ class TestSemanticRetriever:
 
 class TestLLMService:
     def test_llm_initialization(self):
-        from app.llm.service import LLMService, LLMConfig
+        from app.llm.service import LLMConfig, LLMService
+
         config = LLMConfig(model="gpt-4", api_key="test-key")
         service = LLMService(config)
         assert service.config.model == "gpt-4"
 
     @pytest.mark.asyncio
     async def test_generate_response(self):
-        from app.llm.service import LLMService, LLMConfig
+        from app.llm.service import LLMConfig, LLMService
+
         service = LLMService(LLMConfig(api_key="test-key"))
         mock_response = MagicMock()
         mock_response.choices = [MagicMock()]
         mock_response.choices[0].message.content = "This is a response"
-        
-        with patch.object(service._async_client.chat.completions, 'create', new_callable=AsyncMock, return_value=mock_response):
+
+        with patch.object(
+            service._async_client.chat.completions,
+            "create",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ):
             response = await service.generate("What is this code?")
             assert response == "This is a response"
 
@@ -131,6 +141,7 @@ class TestLLMService:
 class TestQAService:
     def test_qa_service_initialization(self):
         from app.rag.qa_service import QAService
+
         llm = Mock()
         retriever = Mock()
         service = QAService(llm, retriever)
@@ -141,6 +152,7 @@ class TestQAService:
     async def test_implementation_qa(self):
         from app.rag.qa_service import QAService
         from app.rag.retriever import RetrievalResult
+
         llm = Mock()
         llm.generate = AsyncMock(return_value="This function prints hello")
         retriever = Mock()
@@ -148,7 +160,9 @@ class TestQAService:
             RetrievalResult(id="1", content="def hello(): print('hello')", score=0.9, metadata={})
         ]
         service = QAService(llm, retriever)
-        response = await service.answer("What does hello function do?", qa_type=QAType.IMPLEMENTATION)
+        response = await service.answer(
+            "What does hello function do?", qa_type=QAType.IMPLEMENTATION
+        )
         assert isinstance(response, QAResponse)
         assert response.answer == "This function prints hello"
 
@@ -156,6 +170,7 @@ class TestQAService:
     async def test_planning_qa(self):
         from app.rag.qa_service import QAService
         from app.rag.retriever import RetrievalResult
+
         llm = Mock()
         llm.generate = AsyncMock(return_value="To add a new feature, you need to...")
         retriever = Mock()
@@ -168,6 +183,7 @@ class TestQAService:
     async def test_hybrid_qa(self):
         from app.rag.qa_service import QAService
         from app.rag.retriever import RetrievalResult
+
         llm = Mock()
         llm.generate = AsyncMock(return_value="Based on the code structure...")
         retriever = Mock()
@@ -180,16 +196,17 @@ class TestQAService:
 
     def test_detect_qa_type(self):
         from app.rag.qa_service import QAService
+
         llm = Mock()
         retriever = Mock()
         service = QAService(llm, retriever)
-        
+
         impl_result = service.detect_qa_type("How is the login function implemented?")
         assert impl_result == QAType.IMPLEMENTATION
-        
+
         plan_result = service.detect_qa_type("I want to create new feature")
         assert plan_result == QAType.PLANNING
-        
+
         hybrid_result = service.detect_qa_type("What is this code about?")
         assert hybrid_result in [QAType.HYBRID, QAType.IMPLEMENTATION]
 

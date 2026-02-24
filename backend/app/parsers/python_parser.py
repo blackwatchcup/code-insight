@@ -1,15 +1,17 @@
-import tree_sitter_python as tspython
-from tree_sitter import Language, Parser, Node
 from typing import List, Optional
+
+import tree_sitter_python as tspython
+from tree_sitter import Language, Node, Parser
+
 from app.parsers.base import (
     BaseParser,
-    ParseResult,
-    FunctionInfo,
-    ClassInfo,
-    ImportInfo,
-    VariableInfo,
-    ParameterInfo,
     CallInfo,
+    ClassInfo,
+    FunctionInfo,
+    ImportInfo,
+    ParameterInfo,
+    ParseResult,
+    VariableInfo,
 )
 
 
@@ -81,7 +83,7 @@ class PythonParser(BaseParser):
 
     def _parse_function(self, node: Node, content: str) -> FunctionInfo:
         name = self._get_node_text(node.child_by_field_name("name"), content) or ""
-        
+
         is_async = False
         for child in node.children:
             if child.type == "async":
@@ -112,9 +114,7 @@ class PythonParser(BaseParser):
 
         for child in params_node.children:
             if child.type == "identifier":
-                parameters.append(
-                    ParameterInfo(name=self._get_node_text(child, content) or "")
-                )
+                parameters.append(ParameterInfo(name=self._get_node_text(child, content) or ""))
             elif child.type == "typed_parameter":
                 # Get the first identifier child as the parameter name
                 name = ""
@@ -215,7 +215,10 @@ class PythonParser(BaseParser):
                         left = expr.child_by_field_name("left")
                         if left:
                             attr_name = self._get_node_text(left, content) or ""
-                            attr_value = self._get_node_text(expr.child_by_field_name("right"), content) or ""
+                            attr_value = (
+                                self._get_node_text(expr.child_by_field_name("right"), content)
+                                or ""
+                            )
                             attributes.append({"name": attr_name, "value": attr_value})
 
         return ClassInfo(
@@ -246,18 +249,22 @@ class PythonParser(BaseParser):
                     if name_node.type == "dotted_name":
                         names.append(self._get_node_text(name_node, content) or "")
                     elif name_node.type == "aliased_import":
-                        name = self._get_node_text(name_node.child_by_field_name("name"), content) or ""
-                        alias = self._get_node_text(name_node.child_by_field_name("alias"), content) or ""
+                        name = (
+                            self._get_node_text(name_node.child_by_field_name("name"), content)
+                            or ""
+                        )
+                        alias = (
+                            self._get_node_text(name_node.child_by_field_name("alias"), content)
+                            or ""
+                        )
                         names.append(f"{name} as {alias}")
                 if names:
-                    imports.append(
-                        ImportInfo(module=names[0], names=names, is_from_import=False)
-                    )
+                    imports.append(ImportInfo(module=names[0], names=names, is_from_import=False))
             elif child.type == "import_from_statement":
                 module = ""
                 names = []
                 found_module = False
-                
+
                 for subchild in child.children:
                     if subchild.type == "dotted_name":
                         if not found_module:
@@ -274,13 +281,21 @@ class PythonParser(BaseParser):
                             if name_node.type == "identifier":
                                 names.append(self._get_node_text(name_node, content) or "")
                             elif name_node.type == "aliased_import":
-                                name = self._get_node_text(name_node.child_by_field_name("name"), content) or ""
-                                alias = self._get_node_text(name_node.child_by_field_name("alias"), content) or ""
+                                name = (
+                                    self._get_node_text(
+                                        name_node.child_by_field_name("name"), content
+                                    )
+                                    or ""
+                                )
+                                alias = (
+                                    self._get_node_text(
+                                        name_node.child_by_field_name("alias"), content
+                                    )
+                                    or ""
+                                )
                                 names.append(f"{name} as {alias}")
-                
-                imports.append(
-                    ImportInfo(module=module, names=names, is_from_import=True)
-                )
+
+                imports.append(ImportInfo(module=module, names=names, is_from_import=True))
         return imports
 
     def _extract_variables(self, node: Node, content: str) -> List[VariableInfo]:
@@ -292,7 +307,9 @@ class PythonParser(BaseParser):
                     left = expr.child_by_field_name("left")
                     if left and left.type == "identifier":
                         name = self._get_node_text(left, content) or ""
-                        value = self._get_node_text(expr.child_by_field_name("right"), content) or ""
+                        value = (
+                            self._get_node_text(expr.child_by_field_name("right"), content) or ""
+                        )
                         variables.append(
                             VariableInfo(
                                 name=name,
@@ -323,7 +340,9 @@ class PythonParser(BaseParser):
         self._traverse_calls(node, content, calls, "")
         return calls
 
-    def _traverse_calls(self, node: Node, content: str, calls: List[CallInfo], current_function: str):
+    def _traverse_calls(
+        self, node: Node, content: str, calls: List[CallInfo], current_function: str
+    ):
         if node.type == "function_definition":
             name_node = node.child_by_field_name("name")
             if name_node:
@@ -379,4 +398,4 @@ class PythonParser(BaseParser):
     def _get_node_text(self, node: Optional[Node], content: str) -> Optional[str]:
         if node is None:
             return None
-        return content[node.start_byte:node.end_byte]
+        return content[node.start_byte : node.end_byte]

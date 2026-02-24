@@ -1,15 +1,17 @@
-import tree_sitter_javascript as tsjs
-from tree_sitter import Language, Parser, Node
 from typing import List, Optional
+
+import tree_sitter_javascript as tsjs
+from tree_sitter import Language, Node, Parser
+
 from app.parsers.base import (
     BaseParser,
-    ParseResult,
-    FunctionInfo,
-    ClassInfo,
-    ImportInfo,
-    VariableInfo,
-    ParameterInfo,
     CallInfo,
+    ClassInfo,
+    FunctionInfo,
+    ImportInfo,
+    ParameterInfo,
+    ParseResult,
+    VariableInfo,
 )
 
 
@@ -66,7 +68,11 @@ class JavaScriptParser(BaseParser):
                 if child.type == "variable_declarator":
                     name_node = child.child_by_field_name("name")
                     value_node = child.child_by_field_name("value")
-                    if name_node and value_node and value_node.type in ("arrow_function", "function_expression"):
+                    if (
+                        name_node
+                        and value_node
+                        and value_node.type in ("arrow_function", "function_expression")
+                    ):
                         name = self._get_node_text(name_node, content) or ""
                         func = self._parse_function(value_node, content, name)
                         functions.append(func)
@@ -75,7 +81,11 @@ class JavaScriptParser(BaseParser):
                 if child.type == "variable_declarator":
                     name_node = child.child_by_field_name("name")
                     value_node = child.child_by_field_name("value")
-                    if name_node and value_node and value_node.type in ("arrow_function", "function_expression"):
+                    if (
+                        name_node
+                        and value_node
+                        and value_node.type in ("arrow_function", "function_expression")
+                    ):
                         name = self._get_node_text(name_node, content) or ""
                         func = self._parse_function(value_node, content, name)
                         functions.append(func)
@@ -142,9 +152,7 @@ class JavaScriptParser(BaseParser):
 
         for child in params_node.children:
             if child.type == "identifier":
-                parameters.append(
-                    ParameterInfo(name=self._get_node_text(child, content) or "")
-                )
+                parameters.append(ParameterInfo(name=self._get_node_text(child, content) or ""))
             elif child.type == "assignment_pattern":
                 name = ""
                 default = ""
@@ -158,13 +166,9 @@ class JavaScriptParser(BaseParser):
                 name = self._get_node_text(child.child_by_field_name("name"), content) or ""
                 parameters.append(ParameterInfo(name=f"...{name}"))
             elif child.type == "object_pattern":
-                parameters.append(
-                    ParameterInfo(name=self._get_node_text(child, content) or "")
-                )
+                parameters.append(ParameterInfo(name=self._get_node_text(child, content) or ""))
             elif child.type == "array_pattern":
-                parameters.append(
-                    ParameterInfo(name=self._get_node_text(child, content) or "")
-                )
+                parameters.append(ParameterInfo(name=self._get_node_text(child, content) or ""))
 
         return parameters
 
@@ -189,7 +193,7 @@ class JavaScriptParser(BaseParser):
     def _parse_class(self, node: Node, content: str) -> ClassInfo:
         name = self._get_node_text(node.child_by_field_name("name"), content) or ""
         base_classes = []
-        
+
         extends = node.child_by_field_name("parent")
         if extends:
             base_classes.append(self._get_node_text(extends, content) or "")
@@ -204,12 +208,20 @@ class JavaScriptParser(BaseParser):
                     method = self._parse_method(child, content)
                     methods.append(method)
                 elif child.type == "field_definition":
-                    field_name = self._get_node_text(child.child_by_field_name("name"), content) or ""
-                    field_value = self._get_node_text(child.child_by_field_name("value"), content) or ""
+                    field_name = (
+                        self._get_node_text(child.child_by_field_name("name"), content) or ""
+                    )
+                    field_value = (
+                        self._get_node_text(child.child_by_field_name("value"), content) or ""
+                    )
                     attributes.append({"name": field_name, "value": field_value})
                 elif child.type == "public_field_definition":
-                    field_name = self._get_node_text(child.child_by_field_name("name"), content) or ""
-                    field_value = self._get_node_text(child.child_by_field_name("value"), content) or ""
+                    field_name = (
+                        self._get_node_text(child.child_by_field_name("name"), content) or ""
+                    )
+                    field_value = (
+                        self._get_node_text(child.child_by_field_name("value"), content) or ""
+                    )
                     attributes.append({"name": field_name, "value": field_value})
 
         return ClassInfo(
@@ -230,7 +242,7 @@ class JavaScriptParser(BaseParser):
         if node.type == "import_statement":
             module = ""
             names = []
-            
+
             source = node.child_by_field_name("source")
             if source:
                 module = self._get_node_text(source, content) or ""
@@ -244,14 +256,27 @@ class JavaScriptParser(BaseParser):
                         elif subchild.type == "named_imports":
                             for spec in subchild.children:
                                 if spec.type == "import_specifier":
-                                    name = self._get_node_text(spec.child_by_field_name("name"), content) or ""
-                                    alias = self._get_node_text(spec.child_by_field_name("alias"), content) or ""
+                                    name = (
+                                        self._get_node_text(
+                                            spec.child_by_field_name("name"), content
+                                        )
+                                        or ""
+                                    )
+                                    alias = (
+                                        self._get_node_text(
+                                            spec.child_by_field_name("alias"), content
+                                        )
+                                        or ""
+                                    )
                                     if alias:
                                         names.append(f"{name} as {alias}")
                                     else:
                                         names.append(name)
                         elif subchild.type == "namespace_import":
-                            alias = self._get_node_text(subchild.child_by_field_name("alias"), content) or ""
+                            alias = (
+                                self._get_node_text(subchild.child_by_field_name("alias"), content)
+                                or ""
+                            )
                             if alias:
                                 names.append(f"* as {alias}")
 
@@ -299,7 +324,9 @@ class JavaScriptParser(BaseParser):
         self._traverse_calls(node, content, calls, "")
         return calls
 
-    def _traverse_calls(self, node: Node, content: str, calls: List[CallInfo], current_function: str):
+    def _traverse_calls(
+        self, node: Node, content: str, calls: List[CallInfo], current_function: str
+    ):
         if node.type == "function_declaration":
             name_node = node.child_by_field_name("name")
             if name_node:
@@ -330,4 +357,4 @@ class JavaScriptParser(BaseParser):
     def _get_node_text(self, node: Optional[Node], content: str) -> Optional[str]:
         if node is None:
             return None
-        return content[node.start_byte:node.end_byte]
+        return content[node.start_byte : node.end_byte]

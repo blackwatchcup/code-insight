@@ -49,12 +49,21 @@ class TestImportService:
         assert import_service._extract_name(url) == "myapp"
 
     def test_detect_source_type_github(self, import_service):
-        assert import_service._detect_source_type("https://github.com/user/repo") == SourceType.GITHUB
-        assert import_service._detect_source_type("https://GITHUB.COM/user/repo") == SourceType.GITHUB
+        assert (
+            import_service._detect_source_type("https://github.com/user/repo") == SourceType.GITHUB
+        )
+        assert (
+            import_service._detect_source_type("https://GITHUB.COM/user/repo") == SourceType.GITHUB
+        )
 
     def test_detect_source_type_gitlab(self, import_service):
-        assert import_service._detect_source_type("https://gitlab.com/user/repo") == SourceType.GITLAB
-        assert import_service._detect_source_type("https://gitlab.company.com/user/repo") == SourceType.GITLAB
+        assert (
+            import_service._detect_source_type("https://gitlab.com/user/repo") == SourceType.GITLAB
+        )
+        assert (
+            import_service._detect_source_type("https://gitlab.company.com/user/repo")
+            == SourceType.GITLAB
+        )
 
     def test_detect_source_type_gitee(self, import_service):
         assert import_service._detect_source_type("https://gitee.com/user/repo") == SourceType.GITEE
@@ -63,7 +72,10 @@ class TestImportService:
         assert import_service._detect_source_type("https://example.com/file.zip") == SourceType.ZIP
 
     def test_detect_source_type_generic_git(self, import_service):
-        assert import_service._detect_source_type("https://git.example.com/user/repo") == SourceType.GIT
+        assert (
+            import_service._detect_source_type("https://git.example.com/user/repo")
+            == SourceType.GIT
+        )
 
     @pytest.mark.asyncio
     async def test_import_from_git_creates_project(self, import_service, db_session, tmp_path):

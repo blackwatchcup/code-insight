@@ -1,6 +1,3 @@
-from app.llm.service import LLMService, LLMConfig
+from app.llm.service import LLMConfig, LLMService
 
-__all__ = [
-    "LLMService",
-    "LLMConfig"
-]
+__all__ = ["LLMService", "LLMConfig"]

@@ -1,15 +1,17 @@
-import tree_sitter_typescript as tstypescript
-from tree_sitter import Language, Parser, Node
 from typing import List, Optional
+
+import tree_sitter_typescript as tstypescript
+from tree_sitter import Language, Node, Parser
+
 from app.parsers.base import (
     BaseParser,
-    ParseResult,
-    FunctionInfo,
-    ClassInfo,
-    ImportInfo,
-    VariableInfo,
-    ParameterInfo,
     CallInfo,
+    ClassInfo,
+    FunctionInfo,
+    ImportInfo,
+    ParameterInfo,
+    ParseResult,
+    VariableInfo,
 )
 
 
@@ -69,7 +71,11 @@ class TypeScriptParser(BaseParser):
                 if child.type == "variable_declarator":
                     name_node = child.child_by_field_name("name")
                     value_node = child.child_by_field_name("value")
-                    if name_node and value_node and value_node.type in ("arrow_function", "function_expression"):
+                    if (
+                        name_node
+                        and value_node
+                        and value_node.type in ("arrow_function", "function_expression")
+                    ):
                         name = self._get_node_text(name_node, content) or ""
                         func = self._parse_function(value_node, content, name)
                         functions.append(func)
@@ -78,7 +84,11 @@ class TypeScriptParser(BaseParser):
                 if child.type == "variable_declarator":
                     name_node = child.child_by_field_name("name")
                     value_node = child.child_by_field_name("value")
-                    if name_node and value_node and value_node.type in ("arrow_function", "function_expression"):
+                    if (
+                        name_node
+                        and value_node
+                        and value_node.type in ("arrow_function", "function_expression")
+                    ):
                         name = self._get_node_text(name_node, content) or ""
                         func = self._parse_function(value_node, content, name)
                         functions.append(func)
@@ -109,7 +119,7 @@ class TypeScriptParser(BaseParser):
         parameters = self._extract_parameters(node, content)
         return_type = self._get_node_text(node.child_by_field_name("return_type"), content) or ""
         # Clean up return type: remove leading colon and whitespace
-        return_type = return_type.lstrip(':').strip()
+        return_type = return_type.lstrip(":").strip()
         body = self._get_node_text(node.child_by_field_name("body"), content) or ""
 
         return FunctionInfo(
@@ -129,7 +139,7 @@ class TypeScriptParser(BaseParser):
         parameters = self._extract_parameters(node, content)
         return_type = self._get_node_text(node.child_by_field_name("return_type"), content) or ""
         # Clean up return type: remove leading colon and whitespace
-        return_type = return_type.lstrip(':').strip()
+        return_type = return_type.lstrip(":").strip()
 
         return FunctionInfo(
             name=name,
@@ -154,7 +164,7 @@ class TypeScriptParser(BaseParser):
         parameters = self._extract_parameters(node, content)
         return_type = self._get_node_text(node.child_by_field_name("return_type"), content) or ""
         # Clean up return type: remove leading colon and whitespace
-        return_type = return_type.lstrip(':').strip()
+        return_type = return_type.lstrip(":").strip()
         body = self._get_node_text(node.child_by_field_name("body"), content) or ""
 
         return FunctionInfo(
@@ -175,7 +185,7 @@ class TypeScriptParser(BaseParser):
         parameters = self._extract_parameters(node, content)
         return_type = self._get_node_text(node.child_by_field_name("return_type"), content) or ""
         # Clean up return type: remove leading colon and whitespace
-        return_type = return_type.lstrip(':').strip()
+        return_type = return_type.lstrip(":").strip()
 
         return FunctionInfo(
             name=name,
@@ -213,20 +223,22 @@ class TypeScriptParser(BaseParser):
                 name = ""
                 type_ann = ""
                 default = ""
-                
+
                 pattern = child.child_by_field_name("pattern")
                 if pattern:
                     name = self._get_node_text(pattern, content) or ""
-                
+
                 type_node = child.child_by_field_name("type")
                 if type_node:
                     type_ann = self._get_node_text(type_node, content) or ""
-                
+
                 value_node = child.child_by_field_name("value")
                 if value_node:
                     default = self._get_node_text(value_node, content) or ""
-                
-                parameters.append(ParameterInfo(name=name, type_annotation=type_ann, default_value=default))
+
+                parameters.append(
+                    ParameterInfo(name=name, type_annotation=type_ann, default_value=default)
+                )
             elif child.type == "rest_parameter":
                 name = ""
                 type_ann = ""
@@ -271,7 +283,7 @@ class TypeScriptParser(BaseParser):
     def _parse_class(self, node: Node, content: str) -> ClassInfo:
         name = self._get_node_text(node.child_by_field_name("name"), content) or ""
         base_classes = []
-        
+
         extends = node.child_by_field_name("parent")
         if extends:
             base_classes.append(self._get_node_text(extends, content) or "")
@@ -298,13 +310,25 @@ class TypeScriptParser(BaseParser):
                     method = self._parse_abstract_method(child, content)
                     methods.append(method)
                 elif child.type == "public_field_definition":
-                    field_name = self._get_node_text(child.child_by_field_name("name"), content) or ""
-                    field_type = self._get_node_text(child.child_by_field_name("type"), content) or ""
-                    field_value = self._get_node_text(child.child_by_field_name("value"), content) or ""
-                    attributes.append({"name": field_name, "type": field_type, "value": field_value})
+                    field_name = (
+                        self._get_node_text(child.child_by_field_name("name"), content) or ""
+                    )
+                    field_type = (
+                        self._get_node_text(child.child_by_field_name("type"), content) or ""
+                    )
+                    field_value = (
+                        self._get_node_text(child.child_by_field_name("value"), content) or ""
+                    )
+                    attributes.append(
+                        {"name": field_name, "type": field_type, "value": field_value}
+                    )
                 elif child.type == "field_definition":
-                    field_name = self._get_node_text(child.child_by_field_name("name"), content) or ""
-                    field_value = self._get_node_text(child.child_by_field_name("value"), content) or ""
+                    field_name = (
+                        self._get_node_text(child.child_by_field_name("name"), content) or ""
+                    )
+                    field_value = (
+                        self._get_node_text(child.child_by_field_name("value"), content) or ""
+                    )
                     attributes.append({"name": field_name, "value": field_value})
 
         return ClassInfo(
@@ -319,7 +343,7 @@ class TypeScriptParser(BaseParser):
     def _parse_interface(self, node: Node, content: str) -> ClassInfo:
         name = self._get_node_text(node.child_by_field_name("name"), content) or ""
         base_classes = []
-        
+
         extends = node.child_by_field_name("extends")
         if extends:
             for child in extends.children:
@@ -336,8 +360,12 @@ class TypeScriptParser(BaseParser):
                     method = self._parse_method_signature(child, content)
                     methods.append(method)
                 elif child.type == "property_signature":
-                    prop_name = self._get_node_text(child.child_by_field_name("name"), content) or ""
-                    prop_type = self._get_node_text(child.child_by_field_name("type"), content) or ""
+                    prop_name = (
+                        self._get_node_text(child.child_by_field_name("name"), content) or ""
+                    )
+                    prop_type = (
+                        self._get_node_text(child.child_by_field_name("type"), content) or ""
+                    )
                     attributes.append({"name": prop_name, "type": prop_type})
 
         return ClassInfo(
@@ -358,7 +386,7 @@ class TypeScriptParser(BaseParser):
         if node.type == "import_statement":
             module = ""
             names = []
-            
+
             source = node.child_by_field_name("source")
             if source:
                 module = self._get_node_text(source, content) or ""
@@ -372,14 +400,27 @@ class TypeScriptParser(BaseParser):
                         elif subchild.type == "named_imports":
                             for spec in subchild.children:
                                 if spec.type == "import_specifier":
-                                    name = self._get_node_text(spec.child_by_field_name("name"), content) or ""
-                                    alias = self._get_node_text(spec.child_by_field_name("alias"), content) or ""
+                                    name = (
+                                        self._get_node_text(
+                                            spec.child_by_field_name("name"), content
+                                        )
+                                        or ""
+                                    )
+                                    alias = (
+                                        self._get_node_text(
+                                            spec.child_by_field_name("alias"), content
+                                        )
+                                        or ""
+                                    )
                                     if alias:
                                         names.append(f"{name} as {alias}")
                                     else:
                                         names.append(name)
                         elif subchild.type == "namespace_import":
-                            alias = self._get_node_text(subchild.child_by_field_name("alias"), content) or ""
+                            alias = (
+                                self._get_node_text(subchild.child_by_field_name("alias"), content)
+                                or ""
+                            )
                             if alias:
                                 names.append(f"* as {alias}")
 
@@ -405,7 +446,10 @@ class TypeScriptParser(BaseParser):
                         name = self._get_node_text(name_node, content) or ""
                         value = self._get_node_text(value_node, content) or ""
                         type_ann = self._get_node_text(type_node, content) or ""
-                        if value_node and value_node.type not in ("arrow_function", "function_expression"):
+                        if value_node and value_node.type not in (
+                            "arrow_function",
+                            "function_expression",
+                        ):
                             variables.append(
                                 VariableInfo(
                                     name=name,
@@ -423,7 +467,9 @@ class TypeScriptParser(BaseParser):
         self._traverse_calls(node, content, calls, "")
         return calls
 
-    def _traverse_calls(self, node: Node, content: str, calls: List[CallInfo], current_function: str):
+    def _traverse_calls(
+        self, node: Node, content: str, calls: List[CallInfo], current_function: str
+    ):
         if node.type == "function_declaration":
             name_node = node.child_by_field_name("name")
             if name_node:
@@ -454,4 +500,4 @@ class TypeScriptParser(BaseParser):
     def _get_node_text(self, node: Optional[Node], content: str) -> Optional[str]:
         if node is None:
             return None
-        return content[node.start_byte:node.end_byte]
+        return content[node.start_byte : node.end_byte]

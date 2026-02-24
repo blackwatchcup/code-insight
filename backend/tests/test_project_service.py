@@ -41,9 +41,7 @@ class TestProjectService:
     ):
         import asyncio
 
-        project = asyncio.run(
-            project_service.create_from_local("Test Project", sample_project_dir)
-        )
+        project = asyncio.run(project_service.create_from_local("Test Project", sample_project_dir))
 
         assert project.id is not None
         assert project.name == "Test Project"
@@ -56,28 +54,20 @@ class TestProjectService:
         import asyncio
 
         with pytest.raises(ValueError, match="does not exist"):
-            asyncio.run(
-                project_service.create_from_local("Test", "/nonexistent/path")
-            )
+            asyncio.run(project_service.create_from_local("Test", "/nonexistent/path"))
 
-    def test_create_from_local_file_not_directory(
-        self, project_service: ProjectService
-    ):
+    def test_create_from_local_file_not_directory(self, project_service: ProjectService):
         import asyncio
 
         with tempfile.NamedTemporaryFile() as tmpfile:
             with pytest.raises(ValueError, match="not a directory"):
-                asyncio.run(
-                    project_service.create_from_local("Test", tmpfile.name)
-                )
+                asyncio.run(project_service.create_from_local("Test", tmpfile.name))
 
     def test_get_project(self, project_service: ProjectService, sample_project_dir: str):
         import asyncio
 
-        created = asyncio.run(
-            project_service.create_from_local("Test", sample_project_dir)
-        )
-        
+        created = asyncio.run(project_service.create_from_local("Test", sample_project_dir))
+
         found = project_service.get_project(created.id)
         assert found is not None
         assert found.id == created.id
@@ -99,16 +89,14 @@ class TestProjectService:
     def test_delete_project(self, project_service: ProjectService, sample_project_dir: str):
         import asyncio
 
-        created = asyncio.run(
-            project_service.create_from_local("Test", sample_project_dir)
-        )
-        
+        created = asyncio.run(project_service.create_from_local("Test", sample_project_dir))
+
         local_path = created.local_path
         assert os.path.exists(local_path)
-        
+
         result = project_service.delete_project(created.id)
         assert result is True
-        
+
         assert project_service.get_project(created.id) is None
         assert not os.path.exists(local_path)
 
@@ -122,15 +110,15 @@ class TestCountFilesAndLines:
         with tempfile.TemporaryDirectory() as tmpdir:
             py_file = Path(tmpdir) / "test.py"
             py_file.write_text("line1\nline2\nline3\n")
-            
+
             js_file = Path(tmpdir) / "test.js"
             js_file.write_text("line1\n")
-            
+
             txt_file = Path(tmpdir) / "readme.txt"
             txt_file.write_text("ignored\n")
-            
+
             file_count, line_count = project_service._count_files_and_lines(Path(tmpdir))
-            
+
             assert file_count == 2
             assert line_count == 4
 
@@ -138,13 +126,13 @@ class TestCountFilesAndLines:
         with tempfile.TemporaryDirectory() as tmpdir:
             py_file = Path(tmpdir) / "test.py"
             py_file.write_text("line1\n")
-            
+
             node_modules = Path(tmpdir) / "node_modules"
             node_modules.mkdir()
             skipped_file = node_modules / "skipped.py"
             skipped_file.write_text("should be skipped\n")
-            
+
             file_count, line_count = project_service._count_files_and_lines(Path(tmpdir))
-            
+
             assert file_count == 1
             assert line_count == 1

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 
 @dataclass(frozen=True)
@@ -117,13 +117,9 @@ class ParseResult:
                 for i in self.imports
             ],
             "variables": [
-                {"name": v.name, "type": v.type_annotation, "line": v.line}
-                for v in self.variables
+                {"name": v.name, "type": v.type_annotation, "line": v.line} for v in self.variables
             ],
-            "calls": [
-                {"caller": c.caller, "callee": c.callee, "line": c.line}
-                for c in self.calls
-            ],
+            "calls": [{"caller": c.caller, "callee": c.callee, "line": c.line} for c in self.calls],
             "error": self.error,
         }
 

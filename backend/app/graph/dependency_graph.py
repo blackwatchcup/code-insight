@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
-from typing import Dict, List, Set, Optional
 from collections import defaultdict
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Dict, List, Optional, Set
 
-from app.parsers.base import ParseResult, ImportInfo
+from app.parsers.base import ImportInfo, ParseResult
 
 
 @dataclass(frozen=True)
@@ -135,17 +135,17 @@ class DependencyAnalyzer:
 
     def _get_module_name(self, file_path: str) -> str:
         path = Path(file_path)
-        
+
         if self.project_path:
             try:
                 rel_path = path.relative_to(self.project_path)
                 parts = list(rel_path.parts)
-                
+
                 if parts and parts[-1] in ("__init__.py", "__init__.ts", "__init__.js"):
                     parts = parts[:-1]
                 elif parts:
                     parts[-1] = parts[-1].rsplit(".", 1)[0]
-                
+
                 return ".".join(parts)
             except ValueError:
                 pass
