@@ -2,6 +2,52 @@ import { create } from 'zustand'
 import { api } from '../services/api'
 import type { ChatSession } from '../types'
 
+interface UserSettings {
+  apiKey: string
+  model: string
+  customModel: string
+  baseUrl: string
+  temperature: number
+  maxTokens: number
+}
+
+const DEFAULT_SETTINGS: UserSettings = {
+  apiKey: '',
+  model: 'deepseek-chat',
+  customModel: '',
+  baseUrl: 'https://api.deepseek.com',
+  temperature: 0.7,
+  maxTokens: 2000,
+}
+
+export const getUserSettings = (): UserSettings => {
+  const savedSettings = localStorage.getItem('user_settings')
+  if (savedSettings) {
+    try {
+      return { ...DEFAULT_SETTINGS, ...JSON.parse(savedSettings) }
+    } catch (e) {
+      console.error('Failed to parse settings:', e)
+    }
+  }
+  return DEFAULT_SETTINGS
+}
+
+export const getLLMConfig = () => {
+  const settings = getUserSettings()
+  const model = settings.model === 'custom' ? settings.customModel : settings.model
+  const baseUrl = settings.model === 'custom' ? settings.baseUrl : undefined
+  
+  if (!settings.apiKey && !baseUrl) {
+    return null
+  }
+  
+  return {
+    model,
+    api_key: settings.apiKey,
+    base_url: baseUrl,
+  }
+}
+
 interface ChatStore {
   isLoading: boolean
   error: string | null
@@ -25,6 +71,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   ask: async (question: string, projectId?: string, sessionId?: string, qaType?: string, topK: number = 5, chatMode: string = 'project') => {
     set({ isLoading: true, error: null })
     try {
+      const llmConfig = getLLMConfig()
+      
       const res = await api.post('/chat/ask', {
         question,
         project_id: projectId,
@@ -32,6 +80,7 @@ export const useChatStore = create<ChatStore>((set) => ({
         qa_type: qaType,
         top_k: topK,
         chat_mode: chatMode,
+        ...llmConfig,
       })
       set({ isLoading: false })
       return res.data.data
@@ -59,6 +108,8 @@ export const useChatStore = create<ChatStore>((set) => ({
   ) => {
     set({ isLoading: true, error: null })
     try {
+      const llmConfig = getLLMConfig()
+      
       const response = await fetch(`${api.defaults.baseURL}/chat/ask/stream`, {
         method: 'POST',
         headers: {
@@ -72,6 +123,7 @@ export const useChatStore = create<ChatStore>((set) => ({
           qa_type: qaType,
           top_k: topK,
           chat_mode: chatMode,
+          ...llmConfig,
         }),
       })
       
@@ -91,29 +143,34 @@ export const useChatStore = create<ChatStore>((set) => ({
         
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            const data = JSON.parse(line.slice(6))
-            if (data.chunk) {
-              onChunk?.(data.chunk)
-            } else if (data.error) {
-              onError?.(data.error)
-              set({ error: data.error, isLoading: false })
-              return
-            } else if (data.done) {
+            const data = line.slice(6)
+            if (data === '[DONE]') {
               set({ isLoading: false })
               return
+            }
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.content) {
+                onChunk?.(parsed.content)
+              }
+            } catch {
+              onChunk?.(data)
             }
           }
         }
       }
+      
+      set({ isLoading: false })
     } catch (err: unknown) {
       const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
-      onError?.(errorObj.message || 'Unknown error')
+      const errorMessage = errorObj.message || 'Stream error'
+      console.error('Chat stream error:', err)
+      set({ error: errorMessage, isLoading: false })
+      onError?.(errorMessage)
     }
   },
   
-  search: async (query: string, projectId?: string, topK: number = 5, threshold?: number) => {
-    set({ isLoading: true, error: null })
+  search: async (query: string, projectId?: string, topK: number = 5, threshold: number = 0.5) => {
     try {
       const res = await api.post('/chat/search', {
         query,
@@ -121,111 +178,86 @@ export const useChatStore = create<ChatStore>((set) => ({
         top_k: topK,
         threshold,
       })
-      set({ isLoading: false })
-      return res.data.data
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
-      throw err
+      return res.data.data.results || []
+    } catch (err) {
+      console.error('Search error:', err)
+      return []
     }
   },
   
   indexProject: async (projectId: string, projectPath: string, fileExtensions?: string[]) => {
-    set({ isLoading: true, error: null })
     try {
       const res = await api.post('/chat/index', {
         project_id: projectId,
         project_path: projectPath,
         file_extensions: fileExtensions,
       })
-      set({ isLoading: false })
       return res.data.data
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
+    } catch (err) {
+      console.error('Index error:', err)
       throw err
     }
   },
   
   deleteProjectIndex: async (projectId: string) => {
-    set({ isLoading: true, error: null })
     try {
       const res = await api.delete(`/chat/index/${projectId}`)
-      set({ isLoading: false })
       return res.data.data
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
+    } catch (err) {
+      console.error('Delete index error:', err)
       throw err
     }
   },
   
-  getChatHistory: async (sessionId: string, limit?: number) => {
-    set({ isLoading: true, error: null })
+  getChatHistory: async (sessionId: string, limit: number = 50) => {
     try {
-      const params = limit ? { limit } : {}
-      const res = await api.get(`/chat/history/${sessionId}`, { params })
-      set({ isLoading: false })
-      return res.data.data
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
-      throw err
+      const res = await api.get(`/chat/history/${sessionId}`, {
+        params: { limit },
+      })
+      return res.data.data || []
+    } catch (err) {
+      console.error('Get history error:', err)
+      return []
     }
   },
   
   clearChatHistory: async (sessionId: string) => {
-    set({ isLoading: true, error: null })
     try {
       await api.delete(`/chat/history/${sessionId}`)
-      set({ isLoading: false })
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
-      throw err
+    } catch (err) {
+      console.error('Clear history error:', err)
     }
   },
-
+  
   listSessions: async (projectId?: string, limit: number = 50, offset: number = 0) => {
-    set({ isLoading: true, error: null })
     try {
-      const params: Record<string, string | number> = { limit, offset }
-      if (projectId) {
-        params.project_id = projectId
-      }
-      const res = await api.get('/chat/sessions', { params })
-      set({ isLoading: false })
-      return res.data.data as ChatSession[]
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
-      throw err
+      const res = await api.get('/chat/sessions', {
+        params: { project_id: projectId, limit, offset },
+      })
+      return res.data.data || []
+    } catch (err) {
+      console.error('List sessions error:', err)
+      return []
     }
   },
-
+  
   deleteSession: async (sessionId: string) => {
-    set({ isLoading: true, error: null })
     try {
-      const res = await api.delete(`/chat/sessions/${sessionId}`)
-      set({ isLoading: false })
-      return res.data.code === 200
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
+      await api.delete(`/chat/history/${sessionId}`)
+      return true
+    } catch (err) {
+      console.error('Delete session error:', err)
       return false
     }
   },
   
   getStats: async () => {
-    set({ isLoading: true, error: null })
     try {
       const res = await api.get('/chat/stats')
-      set({ isLoading: false })
       return res.data.data
-    } catch (err: unknown) {
-      const errorObj = err as { message?: string }
-      set({ error: errorObj.message || 'Unknown error', isLoading: false })
-      throw err
+    } catch (err) {
+      console.error('Get stats error:', err)
+      return null
     }
   },
 }))

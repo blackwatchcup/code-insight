@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from
 import Projects from './pages/Projects'
 import Login from './pages/Login'
 import Chat from './pages/Chat'
+import Settings from './pages/Settings'
 import Analysis from './pages/Analysis'
 import ProjectDetail from './pages/ProjectDetail'
 import Navbar from './components/Navbar'
@@ -74,13 +75,14 @@ function AppContent() {
       <Navbar user={user} onLogout={logout} />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar activeTab={activeTab} onTabChange={handleTabChange} />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-hidden">
           <Routes>
             <Route path="/" element={<Projects />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/chat/:projectId" element={<Chat />} />
+            <Route path="/chat" element={<div className="h-full"><Chat /></div>} />
+            <Route path="/chat/:projectId" element={<div className="h-full"><Chat /></div>} />
             <Route path="/project/:id" element={<ProjectDetail />} />
             <Route path="/analysis" element={<Analysis />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
       </div>

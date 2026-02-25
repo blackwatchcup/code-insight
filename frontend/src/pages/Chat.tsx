@@ -27,6 +27,8 @@ export default function Chat() {
   const [showSidebar, setShowSidebar] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
 
   useEffect(() => {
     fetchProjects()
@@ -76,9 +78,23 @@ export default function Chat() {
     loadHistory()
   }, [sessionId, getChatHistory])
 
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior })
+  }
+
+  const handleScroll = () => {
+    if (containerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current
+      const atBottom = scrollHeight - scrollTop - clientHeight < 50
+      setIsAtBottom(atBottom)
+    }
+  }
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    if (isStreaming || isAtBottom) {
+      scrollToBottom(isStreaming ? 'auto' : 'smooth')
+    }
+  }, [messages, isStreaming, isAtBottom])
 
   const loadSessions = async () => {
     try {
@@ -205,10 +221,10 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-screen">
       <div className={`${showSidebar ? 'w-72' : 'w-0'} flex-shrink-0 bg-gray-50 border-r border-gray-200 transition-all duration-300 overflow-hidden`}>
         <div className="w-72 h-full flex flex-col">
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200 flex-shrink-0">
             <button
               onClick={handleNewChat}
               className="w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
@@ -263,8 +279,8 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col">
-        <div className="p-4 border-b border-gray-200/50 bg-white/80 backdrop-blur-sm flex items-center gap-4">
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="p-4 border-b border-gray-200/50 bg-white/80 backdrop-blur-sm flex-shrink-0 flex items-center gap-4">
           <button
             onClick={() => setShowSidebar(!showSidebar)}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -291,7 +307,11 @@ export default function Chat() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        <div 
+          ref={containerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0"
+        >
           {isLoadingHistory ? (
             <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center gap-3">
@@ -373,7 +393,7 @@ export default function Chat() {
           </div>
         )}
 
-        <div className="p-6 border-t border-gray-200/50 bg-white/80 backdrop-blur-sm">
+        <div className="p-6 border-t border-gray-200/50 bg-white/80 backdrop-blur-sm flex-shrink-0">
           <div className="flex gap-3">
             <textarea
               ref={inputRef}

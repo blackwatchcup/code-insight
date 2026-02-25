@@ -23,7 +23,10 @@ class AskRequest(BaseModel):
     session_id: Optional[str] = None
     qa_type: Optional[str] = None
     top_k: int = 5
-    chat_mode: str = "project"  # "project" or "freeform"
+    chat_mode: str = "project"
+    model: Optional[str] = None
+    api_key: Optional[str] = None
+    base_url: Optional[str] = None  # "project" or "freeform"
 
 
 class AskResponse(BaseModel):
@@ -82,6 +85,15 @@ async def ask_question(
         except ValueError:
             pass
 
+    llm_config = None
+    if request.model or request.api_key or request.base_url:
+        from app.llm.service import LLMConfig
+        llm_config = LLMConfig(
+            model=request.model if request.model else "deepseek-chat",
+            api_key=request.api_key if request.api_key else None,
+            base_url=request.base_url if request.base_url else None,
+        )
+
     response = await rag_service.ask(
         question=request.question,
         project_id=request.project_id,
@@ -89,6 +101,7 @@ async def ask_question(
         qa_type=qa_type,
         top_k=request.top_k,
         chat_mode=request.chat_mode,
+        llm_config=llm_config,
     )
 
     return AskResponse(code=200, data=response.to_dict())
