@@ -5,7 +5,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.core.config import settings
 from app.llm.service import LLMConfig, LLMService
-from app.rag.chat_history import ChatHistoryManager
+from app.rag.database_chat_history import DatabaseChatHistoryManager
 from app.rag.embedder import CodeChunk, CodeEmbedder, EmbeddingConfig
 from app.rag.qa_service import QAResponse, QAService, QAType
 from app.rag.retriever import SemanticRetriever
@@ -41,7 +41,7 @@ class RAGService:
         self.vector_store = ChromaStore(self.vector_store_config)
         self.retriever = SemanticRetriever(self.embedder, self.vector_store)
         self.llm = LLMService(self.llm_config)
-        self.history_manager = ChatHistoryManager()
+        self.history_manager = DatabaseChatHistoryManager()
         self.qa_service = QAService(self.llm, self.retriever, self.history_manager)
 
     async def index_project(
@@ -118,6 +118,7 @@ class RAGService:
         session_id: Optional[str] = None,
         qa_type: Optional[QAType] = None,
         top_k: int = 5,
+        chat_mode: str = "project",
     ) -> QAResponse:
         return await self.qa_service.answer(
             question=question,
@@ -125,6 +126,7 @@ class RAGService:
             project_id=project_id,
             session_id=session_id,
             top_k=top_k,
+            chat_mode=chat_mode,
         )
 
     async def ask_stream(
@@ -134,6 +136,7 @@ class RAGService:
         session_id: Optional[str] = None,
         qa_type: Optional[QAType] = None,
         top_k: int = 5,
+        chat_mode: str = "project",
     ) -> AsyncGenerator[str, None]:
         async for chunk in self.qa_service.answer_stream(
             question=question,
@@ -141,8 +144,22 @@ class RAGService:
             project_id=project_id,
             session_id=session_id,
             top_k=top_k,
+            chat_mode=chat_mode,
         ):
             yield chunk
+
+    def list_sessions(
+        self,
+        project_id: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """List all chat sessions."""
+        return self.history_manager.list_sessions(project_id, limit, offset)
+
+    def delete_session(self, session_id: str) -> bool:
+        """Delete a chat session and all its messages."""
+        return self.history_manager.delete_session(session_id)
 
     def search(
         self,
@@ -160,10 +177,7 @@ class RAGService:
         self, session_id: str, limit: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         history = self.history_manager.get_history(session_id, limit)
-        return [
-            {"role": msg.role, "content": msg.content, "timestamp": msg.timestamp.isoformat()}
-            for msg in history
-        ]
+        return history
 
     def clear_chat_history(self, session_id: str) -> None:
         self.history_manager.clear_history(session_id)

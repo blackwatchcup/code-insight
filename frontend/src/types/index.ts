@@ -26,20 +26,24 @@ export interface ChatMessage {
   content: string
   timestamp: string
   sources?: ChatSource[]
-}
-
-export interface ChatSource {
-  file_path: string
-  content: string
-  score: number
+  chat_mode?: 'project' | 'freeform'
 }
 
 export interface ChatSession {
   id: string
   title: string
   project_id?: string
+  chat_mode?: 'project' | 'freeform'
   created_at: string
   updated_at: string
+  message_count?: number
+  last_message?: string
+}
+
+export interface ChatSource {
+  file_path: string
+  content: string
+  score: number
 }
 
 export interface FeatureNode {

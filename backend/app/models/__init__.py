@@ -1,5 +1,6 @@
 from app.core.database import Base
 from app.models.chat import Chat
+from app.models.chat_message import ChatMessage
 from app.models.feature import Feature
 from app.models.file import File
 from app.models.project import Project, ProjectStatus, SourceType
@@ -12,6 +13,7 @@ __all__ = [
     "ProjectStatus",
     "File",
     "Chat",
+    "ChatMessage",
     "Feature",
     "User",
     "UserRole",

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file contains guidelines for AI agents working in this CodeInsight repository.
+Guidelines for AI agents working in this CodeInsight repository.
 
 ## Build/Lint/Test Commands
 
@@ -9,11 +9,8 @@ This file contains guidelines for AI agents working in this CodeInsight reposito
 ```bash
 cd backend
 
-# Format code
-black .
-
-# Sort imports
-isort .
+# Format & sort imports
+black . && isort .
 
 # Type checking
 mypy .
@@ -24,13 +21,19 @@ pytest
 # Run single test file
 pytest tests/test_parsers.py
 
+# Run single test class
+pytest tests/test_parsers.py::TestPythonParser
+
 # Run single test function
 pytest tests/test_parsers.py::TestPythonParser::test_parse_simple_function
 
 # Run tests with coverage
 pytest --cov=app
 
-# Run development server
+# Run specific test marker
+pytest -m "not slow"
+
+# Development server
 uvicorn app.main:app --reload
 ```
 
@@ -42,29 +45,29 @@ cd frontend
 # Install dependencies
 npm install
 
-# Build
-npm run build
-
-# Lint
-npm run lint
-
-# Type check
-npm run typecheck
-
-# Dev server
+# Development server
 npm run dev
 
-# Preview build
+# Build (includes typecheck)
+npm run build
+
+# Lint only
+npm run lint
+
+# Type check only
+npm run typecheck
+
+# Preview production build
 npm run preview
 ```
 
 ### Full Stack Development
 
 ```bash
-# Backend
+# Terminal 1: Backend
 cd backend && uvicorn app.main:app --reload
 
-# Frontend (separate terminal)
+# Terminal 2: Frontend
 cd frontend && npm run dev
 ```
 
@@ -72,89 +75,88 @@ cd frontend && npm run dev
 
 ### Python (Backend)
 
-**Imports:**
-- Use `isort` profile "black" with line-length 100
-- Standard library imports first, third-party, then local
-- From imports preferred over direct imports
-
+**Imports (isort profile "black", line-length 100):**
 ```python
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends
+from typing import Any, Dict, List, Optional, Tuple
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+
 from app.core.database import get_db
+from app.models.project import Project
 ```
 
 **Type Annotations:**
-- Complete type annotations required for all function parameters and returns
-- Use `Optional[T]` instead of `T | None` for backward compatibility
-- Use `Dict[str, Any]` for flexible data structures
-
 ```python
 async def create_project(
     name: str,
-    owner_id: Optional[str] = None
+    local_path: str,
+    owner_id: Optional[str] = None,
 ) -> Project:
-    """Create a new project.
-    
+    """Create project from local directory.
+
     Args:
         name: Project name
+        local_path: Path to local code directory
         owner_id: User ID if authenticated
-        
+
     Returns:
         Created project instance
+
+    Raises:
+        ValueError: If path doesn't exist or isn't a directory
     """
+    pass
+
+def list_projects(self, page: int = 1, page_size: int = 10) -> Tuple[list, int]:
     pass
 ```
 
 **Error Handling:**
-- Raise HTTPException for API errors (400, 404, 403, 500)
-- Use try-except with specific exception types
-- Log errors appropriately
-
 ```python
-try:
-    project = await service.create_project(name, owner_id)
-except ValueError as e:
-    raise HTTPException(status_code=400, detail=str(e))
-except Exception as e:
-    raise HTTPException(status_code=500, detail="Internal server error")
+from fastapi import HTTPException
+
+# Use specific status codes
+raise HTTPException(status_code=404, detail="Project not found")
+raise HTTPException(status_code=400, detail=str(e))
+raise HTTPException(status_code=403, detail="Access denied")
+
+# In services, use ValueError for validation
+if not os.path.exists(local_path):
+    raise ValueError(f"Local path does not exist: {local_path}")
 ```
 
 **Naming Conventions:**
-- Functions: snake_case (e.g., `get_project`, `create_user`)
-- Classes: PascalCase (e.g., `ProjectService`, `CreateProjectRequest`)
-- Constants: UPPER_SNAKE_CASE (e.g., `MAX_RETRIES`, `DEFAULT_TIMEOUT`)
-- Private methods: single underscore prefix (e.g., `_validate_input`)
+- Functions/variables: `snake_case` (`get_project`, `file_count`)
+- Classes: `PascalCase` (`ProjectService`, `CreateProjectRequest`)
+- Constants: `UPPER_SNAKE_CASE` (`MAX_RETRIES`, `DEFAULT_TIMEOUT`)
+- Private methods: `_single_underscore` (`_validate_input`, `_count_files`)
 
 **Database Models:**
-- Use SQLAlchemy with declarative base
-- Include `to_dict()` method for JSON serialization
-- Use enums for status fields
-- Define relationships explicitly
+```python
+class Project(Base):
+    __tablename__ = "projects"
 
-**Async Patterns:**
-- Use `async def` for all async functions
-- Use `await` for async operations
-- Prefer `async for` when iterating async generators
+    id = Column(String, primary_key=True)
+    name = Column(String, nullable=False)
+    status = Column(Enum(ProjectStatus), default=ProjectStatus.READY)
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "name": self.name, "status": self.status.value}
+```
 
 ### TypeScript (Frontend)
 
-**Imports:**
-- Use ES module syntax
-- Import type-only imports with `import type`
-- Group imports: external, then internal with `@/` alias
-
+**Imports (ES modules, `@/` alias for src):**
 ```typescript
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { api } from '@/services/api'
 import { useProjectStore } from '@/stores/projectStore'
-import type { Project } from '@/types'
+import type { Project, ImportData } from '@/types'
 ```
 
-**Components:**
-- Functional components with Hooks only
-- Define props interface for all components
-- Use destructuring for props
-
+**Components (functional + Hooks, no class components):**
 ```typescript
 interface ProjectCardProps {
   project: Project
@@ -162,30 +164,37 @@ interface ProjectCardProps {
 }
 
 export const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete }) => {
-  return <div>{project.name}</div>
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleDelete = async () => {
+    setIsLoading(true)
+    try {
+      await onDelete(project.id)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="p-4 border rounded">
+      <h3>{project.name}</h3>
+      <button onClick={handleDelete} disabled={isLoading}>
+        Delete
+      </button>
+    </div>
+  )
 }
 ```
 
-**Type Safety:**
-- No `any` types - use `unknown` or specific types
-- Use union types for alternatives
-- Use optional chaining `?.` and nullish coalescing `??`
-
+**Type Safety (strict mode, no `any`):**
 ```typescript
-// Avoid
-const data: any = response.data
-
-// Use
+// Use type assertions only when necessary
 const data = response.data as Project
+
+// Prefer optional chaining and nullish coalescing
 const name = user?.profile?.name ?? 'Unknown'
-```
 
-**State Management:**
-- Use Zustand for global state
-- Interface for store shape
-- Async actions with error handling
-
-```typescript
+// Define interfaces for all data structures
 interface ProjectStore {
   projects: Project[]
   isLoading: boolean
@@ -194,64 +203,80 @@ interface ProjectStore {
 }
 ```
 
-**API Calls:**
-- Use axios with configured base URL
-- Centralized API service in `src/services/api.ts`
-- Handle errors with try-catch
+**State Management (Zustand):**
+```typescript
+export const useProjectStore = create<ProjectStore>((set) => ({
+  projects: [],
+  isLoading: false,
+  error: null,
 
-**Styling:**
-- TailwindCSS utility classes
-- Responsive design with `md:`, `lg:` prefixes
-- Use shadcn/ui components when available
+  fetchProjects: async () => {
+    set({ isLoading: true, error: null })
+    try {
+      const res = await api.get('/projects')
+      const items = res.data.items || res.data.data?.items || []
+      set({ projects: items, isLoading: false })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      set({ error: message, isLoading: false })
+    }
+  },
+}))
+```
 
-## General Guidelines
+**Styling (TailwindCSS):**
+```typescript
+// Use utility classes with responsive prefixes
+<div className="p-4 md:p-6 lg:p-8 bg-white rounded-lg shadow">
+  <h1 className="text-xl font-bold text-gray-900">Title</h1>
+</div>
+```
 
-### Project Structure
+## Project Structure
 
 ```
 code-insight/
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # FastAPI routes
-│   │   ├── core/         # Config, auth, database
-│   │   ├── models/       # SQLAlchemy models
-│   │   ├── parsers/      # Code parsers (Python, JS, TS)
-│   │   ├── services/     # Business logic
-│   │   ├── analysis/     # Code analysis
-│   │   ├── rag/          # RAG components
-│   │   └── llm/          # LLM service
-│   └── tests/            # pytest tests
+│   │   ├── api/           # FastAPI routes (projects, parser, chat, etc.)
+│   │   ├── core/          # Config, auth, database, websocket
+│   │   ├── models/        # SQLAlchemy models (project, user, chat)
+│   │   ├── parsers/       # Code parsers (Python, JS, TS, Go, Java)
+│   │   ├── services/      # Business logic (project, import, rag)
+│   │   ├── analysis/      # Code analysis (feature detection, API extraction)
+│   │   ├── rag/           # RAG components (vector store, retriever, embedder)
+│   │   ├── llm/           # LLM service integration
+│   │   ├── graph/         # Call graph, dependency graph generators
+│   │   └── docs/          # Documentation generators
+│   └── tests/             # pytest tests (test_*.py)
 ├── frontend/
 │   └── src/
-│       ├── components/   # React components
-│       ├── pages/        # Page components
-│       ├── stores/       # Zustand stores
-│       ├── services/     # API service
-│       └── types/        # TypeScript types
+│       ├── components/    # Reusable components (Navbar, Sidebar, etc.)
+│       ├── pages/         # Page components (Projects, Chat, Analysis)
+│       ├── stores/        # Zustand stores (projectStore, chatStore)
+│       ├── services/      # API service (api.ts)
+│       └── types/         # TypeScript interfaces (index.ts)
 ```
 
-### Security
+## Git Commit Format
 
-- Never commit `.env` files or secrets
-- Use environment variables for configuration
-- Validate all inputs
-- Implement proper authentication/authorization
+Conventional Commits: `<type>(<scope>): <subject>`
 
-### Git Commit Format
+**Types:** `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
 
-Follow Conventional Commits: `<type>(<scope>): <subject>`
+**Scopes:** `api`, `parser`, `rag`, `llm`, `ui`, `graph`, `docs`, `config`
 
-Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-Scopes: `api`, `parser`, `rag`, `llm`, `ui`, `config`
+**Examples:**
+```
+feat(api): add project import endpoint
+fix(parser): handle empty file parsing
+refactor(ui): extract ProjectCard component
+test(rag): add vector store unit tests
+docs(api): update endpoint documentation
+```
 
-Examples:
-- `feat(api): add project import endpoint`
-- `fix(parser): handle empty file parsing`
-- `refactor(ui): extract common button component`
+## Pre-Commit Checklist
 
-### Before Committing
-
-Always run:
 ```bash
 # Backend
 cd backend && black . && isort . && mypy . && pytest
@@ -260,22 +285,18 @@ cd backend && black . && isort . && mypy . && pytest
 cd frontend && npm run lint && npm run typecheck && npm run build
 ```
 
-### Key Dependencies
+## Key Dependencies
 
-**Backend:**
-- FastAPI (web framework)
-- SQLAlchemy (ORM)
-- Pydantic (validation)
-- ChromaDB (vector store)
-- OpenAI (LLM)
-- Tree-sitter (parsing)
-- pytest (testing)
+**Backend:** FastAPI, SQLAlchemy, Pydantic, Tree-sitter, OpenAI, pytest-asyncio
 
-**Frontend:**
-- React 18 (UI framework)
-- Vite (build tool)
-- TypeScript (type safety)
-- Zustand (state management)
-- Axios (HTTP client)
-- TailwindCSS (styling)
-- React Router (routing)
+**Frontend:** React 18, Vite, TypeScript, Zustand, Axios, TailwindCSS, React Router
+
+## Prohibitions
+
+- **Never** use `any` type in TypeScript (use `unknown` or specific types)
+- **Never** use `as any`, `@ts-ignore`, `@ts-expect-error` in TypeScript
+- **Never** commit `.env` files, secrets, or API keys
+- **Never** commit `node_modules/`, `__pycache__/`, `.venv/`
+- **Never** use `print()` for debugging in production Python code
+- **Never** push with `--force` to main branch
+- **Never** skip pre-commit checks with `--no-verify`

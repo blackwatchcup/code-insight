@@ -4,20 +4,17 @@ import { useProjectStore } from '../stores/projectStore'
 import { useChatStore } from '../stores/chatStore'
 import FeatureAnalysis from '../components/FeatureAnalysis'
 import ParserAnalysis from '../components/ParserAnalysis'
-import type { ChatMessage } from '../types'
+import Chat from './Chat'
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { fetchProject, deleteProject, isLoading } = useProjectStore()
-  const { indexProject, deleteProjectIndex, ask } = useChatStore()
+  const { indexProject, deleteProjectIndex } = useChatStore()
   
   const [activeTab, setActiveTab] = useState('overview')
   const [project, setProject] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
-  const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [input, setInput] = useState('')
-  const [isStreaming, setIsStreaming] = useState(false)
 
   useEffect(() => {
     loadProject()
@@ -68,45 +65,6 @@ export default function ProjectDetail() {
       } catch (err: any) {
         alert('删除失败: ' + err.message)
       }
-    }
-  }
-
-  const handleChatSend = async () => {
-    if (!input.trim() || isStreaming || !id) return
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-      timestamp: new Date().toISOString(),
-    }
-
-    setMessages((prev) => [...prev, userMessage])
-    setInput('')
-    setIsStreaming(true)
-
-    try {
-      const response = await ask(input, id, undefined, undefined, 5)
-      
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.answer || '',
-        timestamp: new Date().toISOString(),
-        sources: response.sources,
-      }
-
-      setMessages((prev) => [...prev, assistantMessage])
-    } catch (err: any) {
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'Error: ' + (err.message || 'Failed to get response'),
-        timestamp: new Date().toISOString(),
-      }
-      setMessages((prev) => [...prev, errorMessage])
-    } finally {
-      setIsStreaming(false)
     }
   }
 
@@ -261,7 +219,7 @@ export default function ProjectDetail() {
           ))}
         </div>
 
-        <div className="p-6">
+        <div className="p-6 h-[calc(100vh-280px)]">
           {activeTab === 'overview' && (
             <div className="space-y-4">
               <div>
@@ -294,65 +252,8 @@ export default function ProjectDetail() {
           {activeTab === 'features' && <FeatureAnalysis projectId={id!} />}
           
           {activeTab === 'chat' && (
-            <div className="space-y-4">
-              <div className="max-h-96 overflow-y-auto space-y-4">
-                {messages.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                      </svg>
-                    </div>
-                    <p>询问关于此项目的任何问题</p>
-                  </div>
-                ) : (
-                  messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-2xl rounded-xl px-4 py-2 ${
-                          message.role === 'user'
-                            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white'
-                            : 'bg-gray-100 text-gray-900'
-                        }`}
-                      >
-                        <div className="whitespace-pre-wrap text-sm">{message.content}</div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                {isStreaming && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 rounded-xl px-4 py-2">
-                      <div className="flex gap-1">
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleChatSend()}
-                  placeholder="输入问题..."
-                  className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
-                  disabled={isStreaming}
-                />
-                <button
-                  onClick={handleChatSend}
-                  disabled={!input.trim() || isStreaming}
-                  className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-medium hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isStreaming ? '发送中...' : '发送'}
-                </button>
-              </div>
+            <div className="h-full">
+              <Chat />
             </div>
           )}
         </div>

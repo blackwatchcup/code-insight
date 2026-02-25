@@ -23,6 +23,7 @@ class AskRequest(BaseModel):
     session_id: Optional[str] = None
     qa_type: Optional[str] = None
     top_k: int = 5
+    chat_mode: str = "project"  # "project" or "freeform"
 
 
 class AskResponse(BaseModel):
@@ -58,6 +59,16 @@ class HistoryResponse(BaseModel):
     data: List[dict]
 
 
+class SessionListResponse(BaseModel):
+    code: int = 200
+    data: List[dict]
+
+
+class SessionResponse(BaseModel):
+    code: int = 200
+    data: dict
+
+
 @router.post("/ask", response_model=AskResponse, tags=["Chat"])
 async def ask_question(
     request: AskRequest,
@@ -77,6 +88,7 @@ async def ask_question(
         session_id=request.session_id,
         qa_type=qa_type,
         top_k=request.top_k,
+        chat_mode=request.chat_mode,
     )
 
     return AskResponse(code=200, data=response.to_dict())
@@ -103,6 +115,7 @@ async def ask_question_stream(
                 session_id=request.session_id,
                 qa_type=qa_type,
                 top_k=request.top_k,
+                chat_mode=request.chat_mode,
             ):
                 yield f"data: {json.dumps({'chunk': chunk})}\n\n"
 
@@ -198,6 +211,33 @@ async def clear_chat_history(
 ):
     rag_service.clear_chat_history(session_id)
     return {"code": 200, "data": {"message": "History cleared"}}
+
+
+@router.get("/sessions", response_model=SessionListResponse, tags=["Chat"])
+async def list_chat_sessions(
+    project_id: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    current_user: Optional[User] = Depends(get_current_user),
+    rag_service: RAGService = Depends(get_rag_service),
+):
+    """List all chat sessions with metadata."""
+    sessions = rag_service.list_sessions(project_id, limit, offset)
+    return SessionListResponse(code=200, data=sessions)
+
+
+@router.delete("/sessions/{session_id}", tags=["Chat"])
+async def delete_chat_session(
+    session_id: str,
+    current_user: Optional[User] = Depends(get_current_user),
+    rag_service: RAGService = Depends(get_rag_service),
+):
+    """Delete a chat session and all its messages."""
+    success = rag_service.delete_session(session_id)
+    if success:
+        return {"code": 200, "data": {"message": "Session deleted"}}
+    else:
+        raise HTTPException(status_code=404, detail="Session not found")
 
 
 @router.get("/stats", tags=["Chat"])

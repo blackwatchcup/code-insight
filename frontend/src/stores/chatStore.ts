@@ -1,17 +1,20 @@
 import { create } from 'zustand'
 import { api } from '../services/api'
+import type { ChatSession } from '../types'
 
 interface ChatStore {
   isLoading: boolean
   error: string | null
   
-  ask: (question: string, projectId?: string, sessionId?: string, qaType?: string, topK?: number) => Promise<any>
-  askStream: (question: string, projectId?: string, sessionId?: string, qaType?: string, topK?: number, onChunk?: (chunk: string) => void, onError?: (error: string) => void) => Promise<void>
+  ask: (question: string, projectId?: string, sessionId?: string, qaType?: string, topK?: number, chatMode?: string) => Promise<any>
+  askStream: (question: string, projectId?: string, sessionId?: string, qaType?: string, topK?: number, chatMode?: string, onChunk?: (chunk: string) => void, onError?: (error: string) => void) => Promise<void>
   search: (query: string, projectId?: string, topK?: number, threshold?: number) => Promise<any[]>
   indexProject: (projectId: string, projectPath: string, fileExtensions?: string[]) => Promise<any>
   deleteProjectIndex: (projectId: string) => Promise<any>
   getChatHistory: (sessionId: string, limit?: number) => Promise<any[]>
   clearChatHistory: (sessionId: string) => Promise<void>
+  listSessions: (projectId?: string, limit?: number, offset?: number) => Promise<ChatSession[]>
+  deleteSession: (sessionId: string) => Promise<boolean>
   getStats: () => Promise<any>
 }
 
@@ -19,7 +22,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   isLoading: false,
   error: null,
   
-  ask: async (question: string, projectId?: string, sessionId?: string, qaType?: string, topK: number = 5) => {
+  ask: async (question: string, projectId?: string, sessionId?: string, qaType?: string, topK: number = 5, chatMode: string = 'project') => {
     set({ isLoading: true, error: null })
     try {
       const res = await api.post('/chat/ask', {
@@ -28,14 +31,15 @@ export const useChatStore = create<ChatStore>((set) => ({
         session_id: sessionId,
         qa_type: qaType,
         top_k: topK,
+        chat_mode: chatMode,
       })
       set({ isLoading: false })
       return res.data.data
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 
-                           err.response?.data?.message || 
-                           err.response?.data ||
-                           err.message || 
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { detail?: string; message?: string } }; message?: string }
+      const errorMessage = errorObj.response?.data?.detail || 
+                           errorObj.response?.data?.message || 
+                           errorObj.message || 
                            'Failed to get response'
       console.error('Chat error:', err)
       set({ error: errorMessage, isLoading: false })
@@ -49,6 +53,7 @@ export const useChatStore = create<ChatStore>((set) => ({
     sessionId?: string,
     qaType?: string,
     topK: number = 5,
+    chatMode: string = 'project',
     onChunk?: (chunk: string) => void,
     onError?: (error: string) => void
   ) => {
@@ -66,6 +71,7 @@ export const useChatStore = create<ChatStore>((set) => ({
           session_id: sessionId,
           qa_type: qaType,
           top_k: topK,
+          chat_mode: chatMode,
         }),
       })
       
@@ -99,9 +105,10 @@ export const useChatStore = create<ChatStore>((set) => ({
           }
         }
       }
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false })
-      onError?.(err.message)
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
+      onError?.(errorObj.message || 'Unknown error')
     }
   },
   
@@ -116,8 +123,9 @@ export const useChatStore = create<ChatStore>((set) => ({
       })
       set({ isLoading: false })
       return res.data.data
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false })
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
       throw err
     }
   },
@@ -132,8 +140,9 @@ export const useChatStore = create<ChatStore>((set) => ({
       })
       set({ isLoading: false })
       return res.data.data
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false })
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
       throw err
     }
   },
@@ -144,8 +153,9 @@ export const useChatStore = create<ChatStore>((set) => ({
       const res = await api.delete(`/chat/index/${projectId}`)
       set({ isLoading: false })
       return res.data.data
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false })
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
       throw err
     }
   },
@@ -157,8 +167,9 @@ export const useChatStore = create<ChatStore>((set) => ({
       const res = await api.get(`/chat/history/${sessionId}`, { params })
       set({ isLoading: false })
       return res.data.data
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false })
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
       throw err
     }
   },
@@ -168,9 +179,40 @@ export const useChatStore = create<ChatStore>((set) => ({
     try {
       await api.delete(`/chat/history/${sessionId}`)
       set({ isLoading: false })
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false })
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
       throw err
+    }
+  },
+
+  listSessions: async (projectId?: string, limit: number = 50, offset: number = 0) => {
+    set({ isLoading: true, error: null })
+    try {
+      const params: Record<string, string | number> = { limit, offset }
+      if (projectId) {
+        params.project_id = projectId
+      }
+      const res = await api.get('/chat/sessions', { params })
+      set({ isLoading: false })
+      return res.data.data as ChatSession[]
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
+      throw err
+    }
+  },
+
+  deleteSession: async (sessionId: string) => {
+    set({ isLoading: true, error: null })
+    try {
+      const res = await api.delete(`/chat/sessions/${sessionId}`)
+      set({ isLoading: false })
+      return res.data.code === 200
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
+      return false
     }
   },
   
@@ -180,8 +222,9 @@ export const useChatStore = create<ChatStore>((set) => ({
       const res = await api.get('/chat/stats')
       set({ isLoading: false })
       return res.data.data
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false })
+    } catch (err: unknown) {
+      const errorObj = err as { message?: string }
+      set({ error: errorObj.message || 'Unknown error', isLoading: false })
       throw err
     }
   },

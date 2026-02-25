@@ -4,15 +4,21 @@ from enum import Enum
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from app.llm.service import LLMService
-from app.rag.chat_history import ChatHistoryManager
+from app.rag.database_chat_history import DatabaseChatHistoryManager
 from app.rag.citation import Citation, CitationExtractor
 from app.rag.retriever import RetrievalResult, SemanticRetriever
 
 
-class QAType(Enum):
+class QAType(str, Enum):
     IMPLEMENTATION = "implementation"
     PLANNING = "planning"
     HYBRID = "hybrid"
+
+
+class ChatMode(str, Enum):
+    """Chat mode determines how the AI responds."""
+    PROJECT = "project"  # RAG-based, uses project codebase context
+    FREEFORM = "freeform"  # General chat, no project context
 
 
 @dataclass
@@ -83,6 +89,19 @@ Instructions:
 Answer:"""
 
 
+FREEFORM_PROMPT = """You are a helpful AI assistant. Have a natural conversation with the user.
+
+User Message: {question}
+
+Instructions:
+1. Respond naturally and helpfully
+2. Be concise but thorough
+3. If the user asks about code, provide general guidance
+4. Be friendly and professional
+
+Answer:"""
+
+
 class QAService:
     IMPLEMENTATION_KEYWORDS = [
         "how is",
@@ -115,12 +134,12 @@ class QAService:
         self,
         llm: LLMService,
         retriever: SemanticRetriever,
-        history_manager: Optional[ChatHistoryManager] = None,
+        history_manager: Optional[DatabaseChatHistoryManager] = None,
         citation_extractor: Optional[CitationExtractor] = None,
     ):
         self.llm = llm
         self.retriever = retriever
-        self.history_manager = history_manager or ChatHistoryManager()
+        self.history_manager = history_manager or DatabaseChatHistoryManager()
         self.citation_extractor = citation_extractor or CitationExtractor()
 
     async def answer(
@@ -130,15 +149,28 @@ class QAService:
         project_id: Optional[str] = None,
         session_id: Optional[str] = None,
         top_k: int = 5,
+        chat_mode: str = "project",
     ) -> QAResponse:
-        if qa_type is None:
-            qa_type = self.detect_qa_type(question)
+        # Get or create session
+        if session_id:
+            self.history_manager.get_or_create_session(
+                session_id=session_id,
+                project_id=project_id,
+                chat_mode=chat_mode,
+            )
 
-        sources = self.retriever.retrieve(question, top_k=top_k, project_id=project_id)
+        # For free-form mode, skip RAG retrieval
+        if chat_mode == "freeform":
+            prompt = FREEFORM_PROMPT.format(context="", question=question)
+            sources: List[RetrievalResult] = []
+            context = ""
+        else:
+            if qa_type is None:
+                qa_type = self.detect_qa_type(question)
 
-        context = self._build_context(sources)
-
-        prompt = self._get_prompt(qa_type, context, question)
+            sources = self.retriever.retrieve(question, top_k=top_k, project_id=project_id)
+            context = self._build_context(sources)
+            prompt = self._get_prompt(qa_type, context, question)
 
         history = None
         if session_id:
@@ -149,14 +181,31 @@ class QAService:
         citations = self.citation_extractor.extract(answer)
 
         if session_id:
-            self.history_manager.add_message(session_id, "user", question)
-            self.history_manager.add_message(session_id, "assistant", answer)
+            # Update session title from first user message
+            self.history_manager.update_session_title(session_id, question)
+            
+            self.history_manager.add_message(
+                session_id, 
+                "user", 
+                question, 
+                project_id=project_id,
+                chat_mode=chat_mode,
+            )
+            sources_dict = [s.to_dict() for s in sources]
+            self.history_manager.add_message(
+                session_id, 
+                "assistant", 
+                answer, 
+                project_id=project_id,
+                sources=sources_dict,
+                chat_mode=chat_mode,
+            )
 
         confidence = self._calculate_confidence(sources, answer)
 
         return QAResponse(
             answer=answer,
-            qa_type=qa_type,
+            qa_type=qa_type or QAType.HYBRID,
             sources=sources,
             citations=citations,
             confidence=confidence,
@@ -169,13 +218,27 @@ class QAService:
         project_id: Optional[str] = None,
         session_id: Optional[str] = None,
         top_k: int = 5,
+        chat_mode: str = "project",
     ) -> AsyncGenerator[str, None]:
-        if qa_type is None:
-            qa_type = self.detect_qa_type(question)
+        # Get or create session
+        if session_id:
+            self.history_manager.get_or_create_session(
+                session_id=session_id,
+                project_id=project_id,
+                chat_mode=chat_mode,
+            )
 
-        sources = self.retriever.retrieve(question, top_k=top_k, project_id=project_id)
-        context = self._build_context(sources)
-        prompt = self._get_prompt(qa_type, context, question)
+        # For free-form mode, skip RAG retrieval
+        if chat_mode == "freeform":
+            prompt = FREEFORM_PROMPT.format(context="", question=question)
+            sources: List[RetrievalResult] = []
+        else:
+            if qa_type is None:
+                qa_type = self.detect_qa_type(question)
+
+            sources = self.retriever.retrieve(question, top_k=top_k, project_id=project_id)
+            context = self._build_context(sources)
+            prompt = self._get_prompt(qa_type, context, question)
 
         history = None
         if session_id:
@@ -187,8 +250,25 @@ class QAService:
             yield chunk
 
         if session_id:
-            self.history_manager.add_message(session_id, "user", question)
-            self.history_manager.add_message(session_id, "assistant", full_answer)
+            # Update session title from first user message
+            self.history_manager.update_session_title(session_id, question)
+            
+            self.history_manager.add_message(
+                session_id, 
+                "user", 
+                question, 
+                project_id=project_id,
+                chat_mode=chat_mode,
+            )
+            sources_dict = [s.to_dict() for s in sources]
+            self.history_manager.add_message(
+                session_id, 
+                "assistant", 
+                full_answer, 
+                project_id=project_id,
+                sources=sources_dict,
+                chat_mode=chat_mode,
+            )
 
     def detect_qa_type(self, question: str) -> QAType:
         question_lower = question.lower()
