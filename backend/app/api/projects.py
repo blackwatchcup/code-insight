@@ -288,10 +288,15 @@ async def get_git_commits(
         raise HTTPException(500, f"Failed to get git commits: {str(e)}")
 
 
+# Checkout git commit endpoint that accepts commit_hash in request body
+class CheckoutRequest(BaseModel):
+    commit_hash: str
+
+
 @router.post("/{project_id}/git/checkout", tags=["Projects"])
 async def checkout_git_version(
     project_id: str,
-    commit_hash: str,
+    request: CheckoutRequest,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
 ):
@@ -306,7 +311,7 @@ async def checkout_git_version(
             raise HTTPException(403, "Access denied")
 
     try:
-        success = await project_service.checkout_git_version(project_id, commit_hash)
+        success = await project_service.checkout_git_version(project_id, request.commit_hash)
         return {"code": 200, "data": {"success": success}}
     except Exception as e:
         raise HTTPException(500, f"Failed to checkout git version: {str(e)}")

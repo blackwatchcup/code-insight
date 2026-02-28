@@ -110,6 +110,12 @@ class ProjectService:
         if not project:
             return False
 
+        # Delete associated versions first to avoid foreign key constraint issues
+        from app.models.version import Version
+        versions = self.db.query(Version).filter(Version.project_id == project_id).all()
+        for version in versions:
+            self.db.delete(version)
+
         if project.local_path and os.path.exists(project.local_path):
 
             def on_rm_error(func, path, exc_info):
