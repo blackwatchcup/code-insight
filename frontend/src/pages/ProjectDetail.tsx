@@ -20,6 +20,7 @@ export default function ProjectDetail() {
   const [error, setError] = useState<string | null>(null)
   const [projectInfo, setProjectInfo] = useState<{ description: string; architecture: string } | null>(null)
   const [isLoadingInfo, setIsLoadingInfo] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   useEffect(() => {
     loadProject()
@@ -82,6 +83,77 @@ export default function ProjectDetail() {
       console.error('索引错误:', err)
       const errorMsg = err.response?.data?.detail || err.message || '未知错误'
       alert('索引失败: ' + errorMsg)
+    }
+  }
+
+  const handleUpdateProject = async () => {
+    if (!project) return
+
+    setIsUpdating(true)
+    try {
+      alert('开始更新项目...')
+      const response = await api.post(`/projects/${project.id}/update`)
+
+      if (response.data.code === 200) {
+        alert('项目更新成功！')
+        // Reload project data to show updated counts
+        await loadProject()
+      } else {
+        const errorMessage = response.data?.detail || response.data?.message || '未知错误'
+        alert('项目更新失败: ' + errorMessage)
+      }
+    } catch (err: any) {
+      console.error('更新项目错误:', err)
+      console.error('错误详情:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message,
+        code: err.code
+      })
+
+      let errorMsg = err.message || '未知错误'
+
+      // Extract detailed error message from response
+      if (err.response?.data?.detail) {
+        errorMsg = err.response.data.detail
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message
+      } else if (err.response?.status === 404) {
+        errorMsg = '项目不存在'
+      } else if (err.response?.status === 403) {
+        errorMsg = '没有权限更新此项目'
+      } else if (err.response?.status === 500) {
+        errorMsg = '服务器错误，请查看后端日志'
+      }
+
+      alert('更新失败: ' + errorMsg)
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleInitializeGit = async () => {
+    if (!project) return
+    try {
+      const confirmInit = window.confirm('确定要初始化Git仓库吗？')
+      if (!confirmInit) return
+
+      alert('开始初始化Git仓库...')
+      const response = await api.post(`/projects/${project.id}/git/initialize`)
+      if (response.data.code === 200) {
+        if (response.data.data.initialized) {
+          alert('Git仓库初始化成功！')
+        } else {
+          alert('项目已经是Git仓库！')
+        }
+        loadProject()
+      } else {
+        alert('Git仓库初始化失败: ' + (response.data.message || '未知错误'))
+      }
+    } catch (err: any) {
+      console.error('初始化Git仓库错误:', err)
+      const errorMsg = err.response?.data?.detail || err.message || '未知错误'
+      alert('初始化失败: ' + errorMsg)
     }
   }
 
@@ -154,6 +226,37 @@ export default function ProjectDetail() {
           <p className="text-gray-500 text-sm mt-1">{project?.source_type === 'local' ? '本地目录' : project?.source_type?.toUpperCase() ?? '未知来源'}</p>
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={handleUpdateProject}
+            disabled={isUpdating}
+            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUpdating ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12V0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                更新中...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                更新项目
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleInitializeGit}
+            className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+            初始化Git
+          </button>
           <button
             onClick={handleReindex}
             className="px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors flex items-center gap-2"

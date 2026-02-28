@@ -193,3 +193,120 @@ async def get_project_info(
         return {"code": 200, "data": info}
     except Exception as e:
         raise HTTPException(500, f"Failed to get project info: {str(e)}")
+
+
+@router.post("/{project_id}/update", tags=["Projects"])
+async def update_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Check access permission
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(403, "Access denied")
+
+    try:
+        updated_project = await project_service.update_project(project_id)
+        return {"code": 200, "data": updated_project.to_dict()}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to update project: {str(e)}")
+
+
+@router.post("/{project_id}/git/initialize", tags=["Projects"])
+async def initialize_git_repo(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Check access permission
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(403, "Access denied")
+
+    try:
+        initialized = await project_service.initialize_git_repo(project_id)
+        return {"code": 200, "data": {"initialized": initialized}}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to initialize git repo: {str(e)}")
+
+
+@router.get("/{project_id}/git/branches", tags=["Projects"])
+async def get_git_branches(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Check access permission
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(403, "Access denied")
+
+    try:
+        branches = await project_service.get_git_branches(project_id)
+        return {"code": 200, "data": {"branches": branches}}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get git branches: {str(e)}")
+
+
+@router.get("/{project_id}/git/commits", tags=["Projects"])
+async def get_git_commits(
+    project_id: str,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Check access permission
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(403, "Access denied")
+
+    try:
+        commits = await project_service.get_git_commits(project_id, limit)
+        return {"code": 200, "data": {"commits": commits}}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get git commits: {str(e)}")
+
+
+@router.post("/{project_id}/git/checkout", tags=["Projects"])
+async def checkout_git_version(
+    project_id: str,
+    commit_hash: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Check access permission
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(403, "Access denied")
+
+    try:
+        success = await project_service.checkout_git_version(project_id, commit_hash)
+        return {"code": 200, "data": {"success": success}}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to checkout git version: {str(e)}")

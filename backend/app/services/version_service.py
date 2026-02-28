@@ -126,6 +126,178 @@ class VersionService:
 
         return diff
 
+    def create_version_from_git_commit(
+        self,
+        project_id: str,
+        commit_hash: str,
+        version_number: str,
+        description: Optional[str] = None,
+        created_by: Optional[str] = None,
+    ) -> Version:
+        """Create a version from a specific git commit."""
+        project = self.project_service.get_project(project_id)
+        if not project:
+            raise ValueError(f"Project {project_id} not found")
+        
+        project_dir = Path(project.local_path)
+        git_dir = project_dir / ".git"
+        
+        if not git_dir.exists():
+            raise ValueError("Project is not a git repository")
+        
+        try:
+            import subprocess
+            # Checkout the commit
+            subprocess.run(
+                ["git", "checkout", commit_hash],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True
+            )
+            
+            # Count files and lines
+            file_count = 0
+            line_count = 0
+
+            if project_dir.exists():
+                for file_path in project_dir.rglob("*"):
+                    if file_path.is_file() and not self._should_skip(file_path):
+                        file_count += 1
+                        try:
+                            content = file_path.read_text(encoding="utf-8", errors="ignore")
+                            line_count += content.count("\n") + 1
+                        except Exception:
+                            pass
+            
+            # Get commit info
+            result = subprocess.run(
+                ["git", "log", "-1", "--pretty=format:%s", commit_hash],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            commit_message = result.stdout.strip()
+            
+            if not description:
+                description = f"Git commit: {commit_message}"
+            
+            version = Version(
+                id=str(uuid.uuid4()),
+                project_id=project_id,
+                version_number=version_number,
+                description=description,
+                commit_hash=commit_hash,
+                created_by=created_by,
+                file_count=file_count,
+                line_count=line_count,
+            )
+
+            self.db.add(version)
+            self.db.commit()
+            self.db.refresh(version)
+            
+            # Checkout back to original branch
+            subprocess.run(
+                ["git", "checkout", "HEAD"],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True
+            )
+
+            return version
+        except Exception as e:
+            raise ValueError(f"Failed to create version from git commit: {str(e)}")
+
+    def compare_git_versions(
+        self, project_id: str, commit_hash_1: str, commit_hash_2: str
+    ) -> Dict:
+        """Compare two git commits of a project."""
+        project = self.project_service.get_project(project_id)
+        if not project:
+            raise ValueError(f"Project {project_id} not found")
+        
+        project_dir = Path(project.local_path)
+        git_dir = project_dir / ".git"
+        
+        if not git_dir.exists():
+            raise ValueError("Project is not a git repository")
+        
+        try:
+            import subprocess
+            # Get commit info for both versions
+            result1 = subprocess.run(
+                ["git", "log", "-1", "--pretty=format:%H|%s|%an|%ad", commit_hash_1],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            result2 = subprocess.run(
+                ["git", "log", "-1", "--pretty=format:%H|%s|%an|%ad", commit_hash_2],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            
+            # Parse commit info
+            def parse_commit_info(output):
+                parts = output.strip().split('|', 3)
+                if len(parts) >= 4:
+                    return {
+                        "hash": parts[0],
+                        "message": parts[1],
+                        "author": parts[2],
+                        "date": parts[3]
+                    }
+                return {}
+            
+            commit1 = parse_commit_info(result1.stdout)
+            commit2 = parse_commit_info(result2.stdout)
+            
+            # Get file diff
+            diff_result = subprocess.run(
+                ["git", "diff", "--name-status", commit_hash_1, commit_hash_2],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            
+            changes = []
+            added = 0
+            modified = 0
+            deleted = 0
+            
+            for line in diff_result.stdout.strip().split('\n'):
+                if line:
+                    status, file_path = line.split('\t', 1)
+                    if status == 'A':
+                        added += 1
+                        changes.append({"type": "added", "file": file_path})
+                    elif status == 'M':
+                        modified += 1
+                        changes.append({"type": "modified", "file": file_path})
+                    elif status == 'D':
+                        deleted += 1
+                        changes.append({"type": "deleted", "file": file_path})
+            
+            diff = {
+                "commit_1": commit1,
+                "commit_2": commit2,
+                "file_changes": {
+                    "added": added,
+                    "modified": modified,
+                    "deleted": deleted
+                },
+                "changes": changes
+            }
+            
+            return diff
+        except Exception as e:
+            raise ValueError(f"Failed to compare git versions: {str(e)}")
+
     def _should_skip(self, file_path: Path) -> bool:
         """Check if a file should be skipped during counting."""
         skip_dirs = {

@@ -236,3 +236,356 @@ class ProjectService:
             "description": description,
             "architecture": architecture
         }
+
+    async def update_project(self, project_id: str) -> Project:
+        """Update project with latest code.
+
+        For cloud projects: pull latest code from repository
+        For local projects: copy latest code from source path
+
+        Args:
+            project_id: Project ID
+
+        Returns:
+            Updated project instance
+
+        Raises:
+            ValueError: If project not found
+        """
+        import subprocess
+        import shutil
+
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("Project not found")
+
+        project_dir = Path(project.local_path)
+
+        # Verify project directory exists
+        if not project_dir.exists():
+            raise ValueError(f"Project directory does not exist: {project_dir}")
+
+        try:
+            print(f"Updating project {project_id} with source_type: {project.source_type}")
+            print(f"Project local path: {project.local_path}")
+            print(f"Project source URL: {project.source_url}")
+
+            update_success = False
+            update_message = ""
+
+            if project.source_type == SourceType.GITHUB or project.source_type == SourceType.GITLAB or project.source_type == SourceType.GITEE or project.source_type == SourceType.GIT:
+                # For git-based projects, pull latest code
+                print("Attempting to pull git changes...")
+
+                # Check if this is actually a git repository
+                git_dir = project_dir / ".git"
+                if not git_dir.exists():
+                    raise ValueError("Project directory is not a git repository. Please initialize git first.")
+
+                # Try git pull with --no-rebase to avoid conflicts
+                pull_result = subprocess.run(
+                    ["git", "pull", "--no-rebase"],
+                    cwd=str(project_dir),
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8"
+                )
+                print(f"Git pull output: {pull_result.stdout}")
+                if pull_result.stderr:
+                    print(f"Git pull stderr: {pull_result.stderr}")
+                print(f"Git pull return code: {pull_result.returncode}")
+
+                # If pull failed, raise exception with details
+                if pull_result.returncode != 0:
+                    error_msg = pull_result.stderr.strip() or pull_result.stdout.strip() or "Unknown git error"
+                    raise ValueError(f"Git pull failed: {error_msg}")
+
+                update_success = True
+                update_message = "Git pull completed successfully"
+
+            elif project.source_type == SourceType.LOCAL:
+                # For local projects, copy latest code from source path
+                if not project.source_url:
+                    raise ValueError("Local project has no source URL configured")
+
+                source_path = Path(str(project.source_url))
+                print(f"Attempting to copy from source: {project.source_url}")
+
+                # Verify source path exists
+                if not source_path.exists():
+                    raise ValueError(f"Source path does not exist: {source_path}")
+
+                if not source_path.is_dir():
+                    raise ValueError(f"Source path is not a directory: {source_path}")
+
+                # Clear existing directory more carefully
+                # Use a temporary directory to avoid issues if copy fails
+                try:
+                    for item in project_dir.iterdir():
+                        if item.is_file():
+                            item.unlink()
+                        elif item.is_dir():
+                            # Use onerror to handle permission issues
+                            def on_rm_error(func, path, exc_info):
+                                import stat
+                                os.chmod(path, stat.S_IWRITE)
+                                func(path)
+                            shutil.rmtree(item, onerror=on_rm_error)
+                except Exception as e:
+                    print(f"Warning: Failed to clear some items from project directory: {e}")
+
+                # Copy from source path
+                shutil.copytree(source_path, project_dir, dirs_exist_ok=True)
+                print("Copy completed successfully")
+                update_success = True
+                update_message = "Files copied successfully from source"
+
+            elif project.source_type == SourceType.ZIP:
+                raise ValueError("ZIP projects cannot be updated. Please re-import the ZIP file.")
+
+            else:
+                raise ValueError(f"Unsupported source type: {project.source_type}")
+
+            if not update_success:
+                raise ValueError(f"Project update did not complete for {project.source_type}")
+
+            # Update file count and line count
+            file_count, line_count = self._count_files_and_lines(project_dir)
+            project.file_count = file_count
+            project.line_count = line_count
+
+            # Update timestamp
+            from sqlalchemy.sql import func
+            project.updated_at = func.now()
+
+            self.db.commit()
+            self.db.refresh(project)
+
+            print(f"Project updated successfully: {project.name} ({update_message})")
+            return project
+
+        except Exception as e:
+            print(f"Error updating project: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise ValueError(f"Failed to update project: {str(e)}")
+
+    async def initialize_git_repo(self, project_id: str) -> bool:
+        """Initialize git repository for a project if not already a git repo.
+        
+        Args:
+            project_id: Project ID
+            
+        Returns:
+            True if git repo was initialized, False if it already exists
+            
+        Raises:
+            ValueError: If project not found
+        """
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("Project not found")
+        
+        project_dir = Path(project.local_path)
+        git_dir = project_dir / ".git"
+        
+        if git_dir.exists():
+            return False
+        
+        try:
+            import subprocess
+            # Initialize git repo
+            subprocess.run(
+                ["git", "init"],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True
+            )
+            # Create initial commit
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "CodeInsight"],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "codeinsight@example.com"],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "Initial commit by CodeInsight"],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True
+            )
+            return True
+        except Exception as e:
+            raise ValueError(f"Failed to initialize git repo: {str(e)}")
+
+    async def get_git_branches(self, project_id: str) -> list:
+        """Get git branches for a project.
+        
+        Args:
+            project_id: Project ID
+            
+        Returns:
+            List of git branches
+            
+        Raises:
+            ValueError: If project not found or not a git repo
+        """
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("Project not found")
+        
+        project_dir = Path(project.local_path)
+        git_dir = project_dir / ".git"
+        
+        if not git_dir.exists():
+            raise ValueError("Project is not a git repository")
+        
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["git", "branch", "-a"],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            branches = []
+            for line in result.stdout.strip().split('\n'):
+                branch = line.strip().lstrip('* ')
+                if branch:
+                    branches.append(branch)
+            return branches
+        except Exception as e:
+            raise ValueError(f"Failed to get git branches: {str(e)}")
+
+    async def get_git_commits(self, project_id: str, limit: int = 50) -> list:
+        """Get git commits for a project.
+        
+        Args:
+            project_id: Project ID
+            limit: Maximum number of commits to return
+            
+        Returns:
+            List of git commits with hash, message, author, and date
+            
+        Raises:
+            ValueError: If project not found or not a git repo
+        """
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("Project not found")
+        
+        project_dir = Path(project.local_path)
+        git_dir = project_dir / ".git"
+        
+        if not git_dir.exists():
+            raise ValueError("Project is not a git repository")
+        
+        try:
+            import subprocess
+            import os
+            
+            print(f"[DEBUG] get_git_commits called for project {project_id}, limit={limit}")
+            print(f"[DEBUG] project_dir: {project_dir}")
+            print(f"[DEBUG] git_dir exists: {(project_dir / '.git').exists()}")
+            
+            # Use git log with explicit UTF-8 encoding to handle Chinese characters
+            result = subprocess.run(
+                ["git", "log", f"--max-count={limit}", "--pretty=format:%H|%s|%an|%ad", "--encoding=UTF-8"],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            
+            print(f"[DEBUG] git log returncode: {result.returncode}")
+            print(f"[DEBUG] git log stdout: {repr(result.stdout)}")
+            print(f"[DEBUG] git log stderr: {repr(result.stderr)}")
+
+            commits = []
+            if result.returncode == 0 and result.stdout and result.stdout.strip():
+                lines = result.stdout.strip().split('\n')
+                print(f"[DEBUG] Found {len(lines)} log lines")
+                
+                for line in lines:
+                    if not line.strip():
+                        continue
+                    
+                    parts = line.split('|', 3)
+                    if len(parts) >= 4:
+                        commits.append({
+                            "hash": parts[0],
+                            "message": parts[1],
+                            "author": parts[2],
+                            "date": parts[3]
+                        })
+                        print(f"[DEBUG] Parsed commit: hash={parts[0][:7]}, msg={parts[1][:30]}")
+
+            print(f"[DEBUG] Total commits collected: {len(commits)}")
+            
+            if not commits:
+                print(f"[WARNING] No commits found for project {project_id}")
+
+            return commits
+        except Exception as e:
+            print(f"[ERROR] Error getting git commits: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise ValueError(f"Failed to get git commits: {str(e)}")
+
+    async def checkout_git_version(self, project_id: str, commit_hash: str) -> bool:
+        """Checkout a specific git commit for a project.
+        
+        Args:
+            project_id: Project ID
+            commit_hash: Git commit hash to checkout
+            
+        Returns:
+            True if checkout was successful
+            
+        Raises:
+            ValueError: If project not found or not a git repo
+        """
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError("Project not found")
+        
+        project_dir = Path(project.local_path)
+        git_dir = project_dir / ".git"
+        
+        if not git_dir.exists():
+            raise ValueError("Project is not a git repository")
+        
+        try:
+            import subprocess
+            # Checkout the commit
+            subprocess.run(
+                ["git", "checkout", commit_hash],
+                cwd=str(project_dir),
+                check=True,
+                capture_output=True
+            )
+            # Update file count and line count
+            file_count, line_count = self._count_files_and_lines(project_dir)
+            project.file_count = file_count
+            project.line_count = line_count
+            
+            self.db.commit()
+            self.db.refresh(project)
+            
+            return True
+        except Exception as e:
+            raise ValueError(f"Failed to checkout git commit: {str(e)}")

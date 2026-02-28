@@ -116,3 +116,60 @@ async def compare_versions(
         return {"code": 200, "data": diff}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class CreateVersionFromGitRequest(BaseModel):
+    commit_hash: str
+    version_number: str
+    description: Optional[str] = None
+    created_by: Optional[str] = None
+
+
+class CompareGitVersionsRequest(BaseModel):
+    commit_hash_1: str
+    commit_hash_2: str
+
+
+@router.post("/{project_id}/versions/from-git", tags=["Versions"])
+async def create_version_from_git(
+    project_id: str,
+    request: CreateVersionFromGitRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    """Create a version from a specific git commit."""
+    version_service = VersionService(db)
+    owner_id = current_user.id if current_user else None
+
+    try:
+        version = version_service.create_version_from_git_commit(
+            project_id=project_id,
+            commit_hash=request.commit_hash,
+            version_number=request.version_number,
+            description=request.description,
+            created_by=owner_id,
+        )
+        return {"code": 200, "data": version.to_dict()}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{project_id}/versions/compare-git", tags=["Versions"])
+async def compare_git_versions(
+    project_id: str,
+    request: CompareGitVersionsRequest,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    """Compare two git commits of a project."""
+    version_service = VersionService(db)
+
+    try:
+        diff = version_service.compare_git_versions(
+            project_id=project_id,
+            commit_hash_1=request.commit_hash_1,
+            commit_hash_2=request.commit_hash_2,
+        )
+        return {"code": 200, "data": diff}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
