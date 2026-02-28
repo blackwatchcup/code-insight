@@ -1,6 +1,6 @@
 import enum
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, String, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -43,6 +43,7 @@ class Project(Base):
     readme_content = Column(String, nullable=True)  # README文件内容
     project_summary = Column(String, nullable=True)  # LLM生成的项目摘要
     tech_stack = Column(String, nullable=True)  # 技术栈（JSON数组字符串）
+    is_git_repo = Column(Boolean, default=False)  # 是否为Git仓库
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -68,6 +69,7 @@ class Project(Base):
             "readme_content": self.readme_content,
             "project_summary": self.project_summary,
             "tech_stack": self.tech_stack,
+            "is_git_repo": self.is_git_repo,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

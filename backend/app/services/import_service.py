@@ -54,6 +54,9 @@ class ImportService:
         readme_content = self._read_readme(project_dir)
         tech_stack = self._detect_tech_stack(project_dir)
 
+        # Git导入的项目肯定是Git仓库
+        is_git_repo = True
+        
         project = Project(
             id=project_id,
             name=name,
@@ -67,6 +70,7 @@ class ImportService:
             line_count=line_count,
             readme_content=readme_content,
             tech_stack=tech_stack,
+            is_git_repo=is_git_repo,
         )
 
         self.db.add(project)
@@ -108,6 +112,9 @@ class ImportService:
             readme_content = self._read_readme(project_dir)
             tech_stack = self._detect_tech_stack(project_dir)
 
+            # 检查是否为Git仓库
+            is_git_repo = (project_dir / ".git").exists()
+
             project = Project(
                 id=project_id,
                 name=name,
@@ -120,6 +127,7 @@ class ImportService:
                 line_count=line_count,
                 readme_content=readme_content,
                 tech_stack=tech_stack,
+                is_git_repo=is_git_repo,
             )
 
             self.db.add(project)

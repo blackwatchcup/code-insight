@@ -245,7 +245,8 @@ export default function Chat() {
       if (diffMins < 60) return `${diffMins}分钟前`
       if (diffHours < 24) return `${diffHours}小时前`
       if (diffDays < 7) return `${diffDays}天前`
-      return date.toLocaleDateString('zh-CN')
+      // 东八区时间，精确到时分
+      return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
     } catch {
       return ''
     }

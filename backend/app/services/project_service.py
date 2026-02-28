@@ -33,6 +33,9 @@ class ProjectService:
 
         file_count, line_count = self._count_files_and_lines(project_dir)
 
+        # 检查是否为Git仓库
+        is_git_repo = (Path(local_path) / ".git").exists()
+        
         project = Project(
             id=project_id,
             name=name,
@@ -43,6 +46,7 @@ class ProjectService:
             status=ProjectStatus.READY,
             file_count=file_count,
             line_count=line_count,
+            is_git_repo=is_git_repo,
         )
 
         self.db.add(project)
@@ -400,6 +404,10 @@ class ProjectService:
         git_dir = project_dir / ".git"
         
         if git_dir.exists():
+            # Update is_git_repo flag if it's not already set
+            if not project.is_git_repo:
+                project.is_git_repo = True
+                self.db.commit()
             return False
         
         try:
@@ -436,6 +444,11 @@ class ProjectService:
                 check=True,
                 capture_output=True
             )
+            
+            # Update is_git_repo flag
+            project.is_git_repo = True
+            self.db.commit()
+            
             return True
         except Exception as e:
             raise ValueError(f"Failed to initialize git repo: {str(e)}")

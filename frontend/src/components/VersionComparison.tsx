@@ -292,7 +292,7 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('zh-CN')
+    return new Date(dateString).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
   }
 
   return (

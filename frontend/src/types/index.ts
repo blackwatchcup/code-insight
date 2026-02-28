@@ -8,6 +8,7 @@ export interface Project {
   status: string
   file_count: number
   line_count: number
+  is_git_repo?: boolean
   created_at: string
   updated_at: string
 }
