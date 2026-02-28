@@ -39,17 +39,72 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
   const loadFeatures = async () => {
     try {
       const tree = await getFeatureTree(projectId)
-      setFeatureTree(tree?.root || null)
+      // 处理后端返回的数据结构
+      if (tree) {
+        // 创建一个根节点，包含前端和后端功能
+        const rootNode = {
+          id: 'root',
+          name: '项目功能',
+          type: 'component' as const,
+          category: 'frontend' as const,
+          description: '项目功能树',
+          file_path: '',
+          line_start: 0,
+          line_end: 0,
+          children: [
+            tree.frontend,
+            tree.backend
+          ],
+          metadata: {}
+        }
+        setFeatureTree(rootNode)
+      } else {
+        setFeatureTree(null)
+      }
 
-      const [frontend, backend, apis, models] = await Promise.all([
-        getFrontendFeatures(projectId).catch(() => []),
-        getBackendFeatures(projectId).catch(() => []),
+      const [frontendData, backendData, apis, models] = await Promise.all([
+        getFrontendFeatures(projectId).catch(() => null),
+        getBackendFeatures(projectId).catch(() => null),
         getApiEndpoints(projectId).catch(() => []),
         getDataModels(projectId).catch(() => []),
       ])
 
-      setFrontendFeatures(frontend || [])
-      setBackendFeatures(backend || [])
+      // 处理前端功能数据
+      if (frontendData && typeof frontendData === 'object' && !Array.isArray(frontendData)) {
+        const frontendFeaturesList: any[] = []
+        const typedFrontendData = frontendData as any
+        if (typedFrontendData.routes) frontendFeaturesList.push(...typedFrontendData.routes)
+        if (typedFrontendData.page_functions) {
+          Object.values(typedFrontendData.page_functions).forEach((functions: any) => {
+            if (Array.isArray(functions)) {
+              frontendFeaturesList.push(...functions)
+            }
+          })
+        }
+        if (typedFrontendData.api_calls) {
+          Object.values(typedFrontendData.api_calls).forEach((calls: any) => {
+            if (Array.isArray(calls)) {
+              frontendFeaturesList.push(...calls)
+            }
+          })
+        }
+        setFrontendFeatures(frontendFeaturesList)
+      } else {
+        setFrontendFeatures([])
+      }
+
+      // 处理后端功能数据
+      if (backendData && typeof backendData === 'object' && !Array.isArray(backendData)) {
+        const backendFeaturesList: any[] = []
+        const typedBackendData = backendData as any
+        if (typedBackendData.apis) backendFeaturesList.push(...typedBackendData.apis)
+        if (typedBackendData.system_features) backendFeaturesList.push(...typedBackendData.system_features)
+        if (typedBackendData.models) backendFeaturesList.push(...typedBackendData.models)
+        setBackendFeatures(backendFeaturesList)
+      } else {
+        setBackendFeatures([])
+      }
+
       setApiEndpoints(apis || [])
       setDataModels(models || [])
     } catch (err) {
