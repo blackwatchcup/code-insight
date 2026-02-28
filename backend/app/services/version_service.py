@@ -231,6 +231,7 @@ class VersionService:
                 cwd=str(project_dir),
                 check=True,
                 capture_output=True,
+                encoding='utf-8',
                 text=True
             )
             result2 = subprocess.run(
@@ -238,11 +239,14 @@ class VersionService:
                 cwd=str(project_dir),
                 check=True,
                 capture_output=True,
+                encoding='utf-8',
                 text=True
             )
             
             # Parse commit info
             def parse_commit_info(output):
+                if not output:
+                    return {}
                 parts = output.strip().split('|', 3)
                 if len(parts) >= 4:
                     return {
@@ -258,10 +262,11 @@ class VersionService:
             
             # Get file diff with status
             diff_result = subprocess.run(
-                ["git", "diff", "--name-status", commit_hash_1, commit_hash_2],
+                ["git", "diff", commit_hash_1, commit_hash_2, "--name-status"],
                 cwd=str(project_dir),
                 check=True,
                 capture_output=True,
+                encoding='utf-8',
                 text=True
             )
             
@@ -270,18 +275,19 @@ class VersionService:
             modified = 0
             deleted = 0
             
-            for line in diff_result.stdout.strip().split('\n'):
-                if line:
-                    status, file_path = line.split('\t', 1)
-                    if status == 'A':
-                        added += 1
-                        changes.append({"type": "added", "file": file_path})
-                    elif status == 'M':
-                        modified += 1
-                        changes.append({"type": "modified", "file": file_path})
-                    elif status == 'D':
-                        deleted += 1
-                        changes.append({"type": "deleted", "file": file_path})
+            if diff_result.stdout:
+                for line in diff_result.stdout.strip().split('\n'):
+                    if line:
+                        status, file_path = line.split('\t', 1)
+                        if status == 'A':
+                            added += 1
+                            changes.append({"type": "added", "file": file_path})
+                        elif status == 'M':
+                            modified += 1
+                            changes.append({"type": "modified", "file": file_path})
+                        elif status == 'D':
+                            deleted += 1
+                            changes.append({"type": "deleted", "file": file_path})
             
             # Get detailed code changes for modified files
             detailed_changes = []
@@ -294,6 +300,7 @@ class VersionService:
                             cwd=str(project_dir),
                             check=True,
                             capture_output=True,
+                            encoding='utf-8',
                             text=True
                         )
                         change["diff"] = file_diff_result.stdout

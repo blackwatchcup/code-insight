@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { api } from '../services/api'
 
 interface Version {
@@ -59,9 +60,10 @@ interface GitDiff {
 
 interface VersionComparisonProps {
   projectId: string
+  isGitRepo?: boolean
 }
 
-export default function VersionComparison({ projectId }: VersionComparisonProps) {
+export default function VersionComparison({ projectId, isGitRepo = false }: VersionComparisonProps) {
   const [versions, setVersions] = useState<Version[]>([])
   const [selectedVersion1, setSelectedVersion1] = useState<string>('')
   const [selectedVersion2, setSelectedVersion2] = useState<string>('')
@@ -229,22 +231,50 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
   const generateLlmSummary = async (gitDiffData: GitDiff) => {
     setIsGeneratingSummary(true)
     try {
-      // 构建提示信息
-      const prompt = `请分析以下两个Git提交之间的代码变化，总结修改的逻辑和目的：\n\n` +
-        `提交1: ${gitDiffData.commit_1.message} (${gitDiffData.commit_1.hash.substring(0, 7)})\n` +
-        `提交2: ${gitDiffData.commit_2.message} (${gitDiffData.commit_2.hash.substring(0, 7)})\n\n` +
-        `文件变更：\n` +
-        `- 新增文件: ${gitDiffData.file_changes.added}\n` +
-        `- 修改文件: ${gitDiffData.file_changes.modified}\n` +
-        `- 删除文件: ${gitDiffData.file_changes.deleted}\n\n` +
-        `详细变更：\n` +
-        gitDiffData.changes.map(change => {
-          let line = `${change.type === 'added' ? '+' : change.type === 'modified' ? '~' : '-'} ${change.file}`
-          if (change.diff) {
-            line += `\n${change.diff.substring(0, 500)}...` // 只取前500字符，避免提示过长
-          }
-          return line
-        }).join('\n')
+      // 构建详细的代码变更信息
+      const detailedChanges = gitDiffData.changes.map(change => {
+        let changeInfo = `【${change.type === 'added' ? '新增' : change.type === 'modified' ? '修改' : '删除'}】${change.file}`
+        if (change.diff) {
+          // 提供更完整的diff信息（前1000字符）
+          changeInfo += `\n代码变更：\n${change.diff.substring(0, 1000)}${change.diff.length > 1000 ? '\n... (更多内容已省略)' : ''}`
+        }
+        return changeInfo
+      }).join('\n\n')
+
+      // 构建优化的提示信息
+      const prompt = `你是一位资深的代码审查专家。请深入分析以下两个Git提交之间的代码变化，提供详细的技术分析报告。
+
+## 提交信息
+**提交1 (基准版本):**
+- Hash: ${gitDiffData.commit_1.hash.substring(0, 7)}
+- 消息: ${gitDiffData.commit_1.message}
+- 作者: ${gitDiffData.commit_1.author}
+- 日期: ${gitDiffData.commit_1.date}
+
+**提交2 (对比版本):**
+- Hash: ${gitDiffData.commit_2.hash.substring(0, 7)}
+- 消息: ${gitDiffData.commit_2.message}
+- 作者: ${gitDiffData.commit_2.author}
+- 日期: ${gitDiffData.commit_2.date}
+
+## 文件变更统计
+- 新增文件: ${gitDiffData.file_changes.added} 个
+- 修改文件: ${gitDiffData.file_changes.modified} 个
+- 删除文件: ${gitDiffData.file_changes.deleted} 个
+
+## 详细代码变更
+${detailedChanges}
+
+## 分析要求
+请从以下几个维度进行深入分析：
+
+1. **变更概述**: 简要总结这次变更的主要内容和目的
+2. **技术实现**: 分析具体的技术实现方式和关键代码逻辑
+3. **架构影响**: 评估变更对项目架构的影响（如模块划分、依赖关系等）
+4. **潜在风险**: 指出可能存在的问题或需要注意的地方
+5. **改进建议**: 如果有更好的实现方式，请提出建议
+
+请使用Markdown格式输出，确保结构清晰、重点突出。`
       
       // 调用LLM API
       const llmRes = await api.post(`/chat/ask`, {
@@ -297,69 +327,6 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
 
   return (
     <div className="space-y-6">
-      {/* Create Version Section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">创建新版本</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <input
-            type="text"
-            placeholder="版本号 (例如: 1.0.0)"
-            value={newVersionNumber}
-            onChange={(e) => setNewVersionNumber(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            placeholder="版本描述 (可选)"
-            value={newVersionDescription}
-            onChange={(e) => setNewVersionDescription(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleCreateVersion}
-            disabled={isCreating}
-            className="px-6 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50"
-          >
-            {isCreating ? '创建中...' : '创建版本'}
-          </button>
-        </div>
-      </div>
-
-      {/* Git Version Section */}
-      {gitCommits.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">从Git提交创建版本</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              placeholder="版本号 (例如: 1.0.0)"
-              value={newGitVersionNumber}
-              onChange={(e) => setNewGitVersionNumber(e.target.value)}
-              className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <select
-              value={selectedCommitForVersion}
-              onChange={(e) => setSelectedCommitForVersion(e.target.value)}
-              className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">选择Git提交</option>
-              {gitCommits.map((commit) => (
-                <option key={commit.hash} value={commit.hash}>
-                  {commit.message.substring(0, 50)} ({commit.hash.substring(0, 7)})
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleCreateVersionFromGit}
-              disabled={isCreatingGitVersion}
-              className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
-            >
-              {isCreatingGitVersion ? '创建中...' : '从Git创建'}
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Git Commits Section */}
       {gitCommits.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -401,42 +368,6 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
           </div>
         </div>
       )}
-
-      {/* Version List */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">版本列表 ({versions.length})</h3>
-        {versions.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">暂无版本记录</div>
-        ) : (
-          <div className="space-y-3">
-            {versions.map((version) => (
-              <div
-                key={version.id}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className="text-sm font-semibold text-gray-900">{version.version_number}</span>
-                    {version.commit_hash && (
-                      <span className="text-xs text-gray-500 font-mono bg-gray-200 px-2 py-0.5 rounded">
-                        {version.commit_hash.substring(0, 7)}
-                      </span>
-                    )}
-                  </div>
-                  {version.description && (
-                    <div className="text-sm text-gray-600 mb-1">{version.description}</div>
-                  )}
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                    <span>{formatDate(version.created_at)}</span>
-                    <span>{version.file_count} 文件</span>
-                    <span>{version.line_count.toLocaleString()} 行代码</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Compare Versions */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -631,7 +562,9 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
                 {isGeneratingSummary ? (
                   <div className="animate-pulse">正在分析代码变化，请稍候...</div>
                 ) : llmSummary ? (
-                  <div className="whitespace-pre-wrap">{llmSummary}</div>
+                  <div className="prose max-w-none">
+                    <ReactMarkdown>{llmSummary}</ReactMarkdown>
+                  </div>
                 ) : (
                   <div className="text-gray-500">点击"比较Git提交"按钮后将生成变化说明</div>
                 )}
@@ -639,37 +572,41 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
             </div>
 
             {gitDiff.changes.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-gray-900">详细变更</h4>
-                <div className="max-h-96 overflow-auto">
+                <div className="max-h-96 overflow-auto space-y-4">
                   {gitDiff.changes.map((change, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3 rounded-lg text-sm mb-2 ${
+                    <div key={idx} className="border rounded-lg overflow-hidden">
+                      {/* 文件标题 */}
+                      <div className={`px-4 py-2 font-medium text-sm ${
                         change.type === 'added'
-                          ? 'bg-green-50 text-green-800 border border-green-200'
+                          ? 'bg-green-50 text-green-800 border-b border-green-200'
                           : change.type === 'modified'
-                          ? 'bg-yellow-50 text-yellow-800 border border-yellow-200'
-                          : 'bg-red-50 text-red-800 border border-red-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{change.type === 'added' ? '+' : change.type === 'modified' ? '~' : '-'}</span>
+                          ? 'bg-yellow-50 text-yellow-800 border-b border-yellow-200'
+                          : 'bg-red-50 text-red-800 border-b border-red-200'
+                      }`}>
+                        <span className="mr-2">{change.type === 'added' ? '+' : change.type === 'modified' ? '~' : '-'}</span>
                         <span>{change.file}</span>
                       </div>
+                      
+                      {/* diff内容 */}
                       {change.diff && (
-                        <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono overflow-auto max-h-48">
-                          <pre className="whitespace-pre-wrap break-words">
-                            {change.diff.split('\n').map((line, index) => {
-                              if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
-                                return <div key={index} className="text-gray-500">{line}</div>
-                              } else if (line.startsWith('+')) {
-                                return <div key={index} className="text-green-600">{line}</div>
+                        <div className="p-4 bg-gray-50">
+                          <pre className="text-xs font-mono overflow-x-auto">
+                            {change.diff.split('\n').map((line, lineIdx) => {
+                              let lineClass = 'text-gray-700'
+                              if (line.startsWith('+')) {
+                                lineClass = 'text-green-600 bg-green-50'
                               } else if (line.startsWith('-')) {
-                                return <div key={index} className="text-red-600">{line}</div>
-                              } else {
-                                return <div key={index}>{line}</div>
+                                lineClass = 'text-red-600 bg-red-50'
+                              } else if (line.startsWith('@@')) {
+                                lineClass = 'text-blue-600 bg-blue-50'
                               }
+                              return (
+                                <div key={lineIdx} className={lineClass}>
+                                  {line}
+                                </div>
+                              )
                             })}
                           </pre>
                         </div>

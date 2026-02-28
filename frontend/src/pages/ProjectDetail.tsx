@@ -5,6 +5,7 @@ import { useChatStore } from '../stores/chatStore'
 import FeatureAnalysis from '../components/FeatureAnalysis'
 import ParserAnalysis from '../components/ParserAnalysis'
 import VersionComparison from '../components/VersionComparison'
+import { VersionSwitcher } from '../components/VersionSwitcher'
 import Chat from './Chat'
 import { api } from '../services/api'
 import ReactMarkdown from 'react-markdown'
@@ -349,6 +350,16 @@ export default function ProjectDetail() {
         </div>
       )}
 
+      {/* Git Version Switcher */}
+      <VersionSwitcher 
+        projectId={id!} 
+        isGitRepo={project?.is_git_repo || false}
+        onVersionChanged={(commitHash) => {
+          // 版本切换后重新加载项目信息
+          loadProject()
+        }}
+      />
+
       <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200/50 overflow-hidden">
         <div className="flex items-center gap-2 border-b border-gray-200/50 px-6">
           {tabs.map((tab) => (
@@ -477,7 +488,7 @@ export default function ProjectDetail() {
           
           {activeTab === 'features' && <FeatureAnalysis projectId={id!} project={project} />}
           
-          {activeTab === 'versions' && <VersionComparison projectId={id!} />}
+          {activeTab === 'versions' && <VersionComparison projectId={id!} isGitRepo={project?.is_git_repo || false} />}
           
           {activeTab === 'chat' && (
             <div className="h-full">

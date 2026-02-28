@@ -23,7 +23,7 @@ class ImportService:
         url: str,
         branch: str = "main",
         token: Optional[str] = None,
-        depth: int = 1,
+        depth: int = 0,  # 0 means full clone
         name: Optional[str] = None,
         owner_id: Optional[str] = None,
     ) -> Project:
@@ -45,10 +45,11 @@ class ImportService:
 
         actual_branch = self._get_default_branch(url, branch)
         
+        # 不使用depth参数，克隆完整的仓库
         if actual_branch:
-            git.Repo.clone_from(url, project_dir, branch=actual_branch, depth=depth)
+            git.Repo.clone_from(url, project_dir, branch=actual_branch)
         else:
-            git.Repo.clone_from(url, project_dir, depth=depth)
+            git.Repo.clone_from(url, project_dir)
 
         file_count, line_count = self._count_files_and_lines(project_dir)
         readme_content = self._read_readme(project_dir)

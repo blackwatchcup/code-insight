@@ -530,6 +530,7 @@ class ProjectService:
                 cwd=str(project_dir),
                 check=True,
                 capture_output=True,
+                encoding='utf-8',
                 text=True
             )
             
