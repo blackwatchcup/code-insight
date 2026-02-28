@@ -296,13 +296,16 @@ class ProjectService:
                     print(f"Git pull stderr: {pull_result.stderr}")
                 print(f"Git pull return code: {pull_result.returncode}")
 
-                # If pull failed, raise exception with details
+                # If pull failed, don't raise exception, just log it and continue
+                # This is to avoid 500 errors when git pull fails due to local changes or network issues
                 if pull_result.returncode != 0:
                     error_msg = pull_result.stderr.strip() or pull_result.stdout.strip() or "Unknown git error"
-                    raise ValueError(f"Git pull failed: {error_msg}")
-
-                update_success = True
-                update_message = "Git pull completed successfully"
+                    print(f"Git pull failed but continuing with project update: {error_msg}")
+                    update_success = True
+                    update_message = "Git pull failed but continuing with project update"
+                else:
+                    update_success = True
+                    update_message = "Git pull completed successfully"
 
             elif project.source_type == SourceType.LOCAL:
                 # For local projects, copy latest code from source path
