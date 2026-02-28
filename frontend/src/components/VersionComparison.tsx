@@ -53,6 +53,7 @@ interface GitDiff {
   changes: Array<{
     type: string
     file: string
+    diff?: string
   }>
 }
 
@@ -68,6 +69,8 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
   const [gitDiff, setGitDiff] = useState<GitDiff | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [llmSummary, setLlmSummary] = useState<string | null>(null)
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false)
   const [newVersionNumber, setNewVersionNumber] = useState('')
   const [newVersionDescription, setNewVersionDescription] = useState('')
   
@@ -212,11 +215,54 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
       })
       setGitDiff(res.data.data)
       setDiff(null)
+      
+      // 调用LLM生成变化说明
+      generateLlmSummary(res.data.data)
     } catch (err: any) {
       console.error('Failed to compare Git versions:', err)
       alert('Git版本比较失败: ' + (err.response?.data?.detail || err.message))
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const generateLlmSummary = async (gitDiffData: GitDiff) => {
+    setIsGeneratingSummary(true)
+    try {
+      // 构建提示信息
+      const prompt = `请分析以下两个Git提交之间的代码变化，总结修改的逻辑和目的：\n\n` +
+        `提交1: ${gitDiffData.commit_1.message} (${gitDiffData.commit_1.hash.substring(0, 7)})\n` +
+        `提交2: ${gitDiffData.commit_2.message} (${gitDiffData.commit_2.hash.substring(0, 7)})\n\n` +
+        `文件变更：\n` +
+        `- 新增文件: ${gitDiffData.file_changes.added}\n` +
+        `- 修改文件: ${gitDiffData.file_changes.modified}\n` +
+        `- 删除文件: ${gitDiffData.file_changes.deleted}\n\n` +
+        `详细变更：\n` +
+        gitDiffData.changes.map(change => {
+          let line = `${change.type === 'added' ? '+' : change.type === 'modified' ? '~' : '-'} ${change.file}`
+          if (change.diff) {
+            line += `\n${change.diff.substring(0, 500)}...` // 只取前500字符，避免提示过长
+          }
+          return line
+        }).join('\n')
+      
+      // 调用LLM API
+      const llmRes = await api.post(`/chat/ask`, {
+        question: prompt,
+        project_id: projectId,
+        chat_mode: 'project'
+      })
+      
+      if (llmRes.data.code === 200) {
+        setLlmSummary(llmRes.data.data.answer || '无法生成总结')
+      } else {
+        setLlmSummary('无法生成总结: ' + (llmRes.data.message || '未知错误'))
+      }
+    } catch (err: any) {
+      console.error('Failed to generate LLM summary:', err)
+      setLlmSummary('生成总结失败: ' + (err.response?.data?.detail || err.message))
+    } finally {
+      setIsGeneratingSummary(false)
     }
   }
 
@@ -576,6 +622,22 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
               </div>
             </div>
 
+            {/* LLM 生成的变化说明 */}
+            <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+              <h4 className="text-sm font-semibold text-purple-900 mb-3">
+                {isGeneratingSummary ? '生成变化说明中...' : 'LLM 变化说明'}
+              </h4>
+              <div className="text-sm text-purple-700">
+                {isGeneratingSummary ? (
+                  <div className="animate-pulse">正在分析代码变化，请稍候...</div>
+                ) : llmSummary ? (
+                  <div className="whitespace-pre-wrap">{llmSummary}</div>
+                ) : (
+                  <div className="text-gray-500">点击"比较Git提交"按钮后将生成变化说明</div>
+                )}
+              </div>
+            </div>
+
             {gitDiff.changes.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-sm font-semibold text-gray-900">详细变更</h4>
@@ -583,7 +645,7 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
                   {gitDiff.changes.map((change, idx) => (
                     <div
                       key={idx}
-                      className={`p-3 rounded-lg text-sm ${
+                      className={`p-3 rounded-lg text-sm mb-2 ${
                         change.type === 'added'
                           ? 'bg-green-50 text-green-800 border border-green-200'
                           : change.type === 'modified'
@@ -595,6 +657,23 @@ export default function VersionComparison({ projectId }: VersionComparisonProps)
                         <span className="font-medium">{change.type === 'added' ? '+' : change.type === 'modified' ? '~' : '-'}</span>
                         <span>{change.file}</span>
                       </div>
+                      {change.diff && (
+                        <div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono overflow-auto max-h-48">
+                          <pre className="whitespace-pre-wrap break-words">
+                            {change.diff.split('\n').map((line, index) => {
+                              if (line.startsWith('+++') || line.startsWith('---') || line.startsWith('@@')) {
+                                return <div key={index} className="text-gray-500">{line}</div>
+                              } else if (line.startsWith('+')) {
+                                return <div key={index} className="text-green-600">{line}</div>
+                              } else if (line.startsWith('-')) {
+                                return <div key={index} className="text-red-600">{line}</div>
+                              } else {
+                                return <div key={index}>{line}</div>
+                              }
+                            })}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

@@ -256,7 +256,7 @@ class VersionService:
             commit1 = parse_commit_info(result1.stdout)
             commit2 = parse_commit_info(result2.stdout)
             
-            # Get file diff
+            # Get file diff with status
             diff_result = subprocess.run(
                 ["git", "diff", "--name-status", commit_hash_1, commit_hash_2],
                 cwd=str(project_dir),
@@ -282,6 +282,24 @@ class VersionService:
                     elif status == 'D':
                         deleted += 1
                         changes.append({"type": "deleted", "file": file_path})
+            
+            # Get detailed code changes for modified files
+            detailed_changes = []
+            for change in changes:
+                if change["type"] == "modified":
+                    try:
+                        # Get detailed diff for this file
+                        file_diff_result = subprocess.run(
+                            ["git", "diff", commit_hash_1, commit_hash_2, "--", change["file"]],
+                            cwd=str(project_dir),
+                            check=True,
+                            capture_output=True,
+                            text=True
+                        )
+                        change["diff"] = file_diff_result.stdout
+                    except Exception:
+                        # If we can't get detailed diff, just skip it
+                        pass
             
             diff = {
                 "commit_1": commit1,

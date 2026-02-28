@@ -244,7 +244,7 @@ export const useChatStore = create<ChatStore>((set) => ({
   
   deleteSession: async (sessionId: string) => {
     try {
-      await api.delete(`/chat/history/${sessionId}`)
+      await api.delete(`/chat/sessions/${sessionId}`)
       return true
     } catch (err) {
       console.error('Delete session error:', err)
