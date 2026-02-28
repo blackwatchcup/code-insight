@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react'
 import { useParserStore } from '../stores/parserStore'
-import type { ProjectStructure, CallGraph, DependencyGraph } from '../types'
+import type { ProjectStructure, DependencyGraph } from '../types'
 
 interface ParserAnalysisProps {
   projectId: string
+  project?: any
 }
 
-export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
+export default function ParserAnalysis({ projectId, project }: ParserAnalysisProps) {
   const [activeTab, setActiveTab] = useState('structure')
   const [structure, setStructure] = useState<ProjectStructure | null>(null)
-  const [callGraph, setCallGraph] = useState<CallGraph | null>(null)
   const [dependencies, setDependencies] = useState<DependencyGraph | null>(null)
   const [summary, setSummary] = useState<any>(null)
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
+  const [expandedSections, setExpandedSections] = useState({
+    internalModules: true,
+    externalModules: true,
+    showAllInternal: false,
+    showAllExternal: false
+  })
   
-  const { getProjectStructure, getCallGraph, getDependencies, getProjectSummary, isLoading, error } = useParserStore()
+  const { getProjectStructure, getDependencies, getProjectSummary, isLoading, error } = useParserStore()
 
   useEffect(() => {
     loadTabData(activeTab)
@@ -29,16 +35,6 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
             setStructure(struct)
           } catch (err) {
             console.error('Failed to load structure:', err)
-          }
-        }
-        break
-      case 'callgraph':
-        if (!callGraph) {
-          try {
-            const graph = await getCallGraph(projectId)
-            setCallGraph(graph)
-          } catch (err) {
-            console.error('Failed to load call graph:', err)
           }
         }
         break
@@ -65,43 +61,90 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
     }
   }
 
-  const toggleFile = (filePath: string) => {
-    const newExpanded = new Set(expandedFiles)
-    if (newExpanded.has(filePath)) {
-      newExpanded.delete(filePath)
-    } else {
-      newExpanded.add(filePath)
-    }
-    setExpandedFiles(newExpanded)
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }))
+  }
+
+  const toggleShowAll = (type: 'internal' | 'external') => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [`showAll${type.charAt(0).toUpperCase() + type.slice(1)}`]: !prev[`showAll${type.charAt(0).toUpperCase() + type.slice(1)}`]
+    }))
   }
 
   const renderFileStructure = (files: any[], level: number = 0) => {
-    return files.slice(0, 100).map((file, idx) => {
-      const hasChildren = (file.functions && file.functions.length > 0) || (file.classes && file.classes.length > 0)
-      const isExpanded = expandedFiles.has(file.file_path)
+    // 构建树形结构
+    const tree = buildTree(files)
+    return renderTree(tree, level)
+  }
+
+  const buildTree = (files: any[]) => {
+    const tree: any = { children: {} }
+    
+    files.forEach(file => {
+      // 移除路径前缀，只显示相对路径
+      let displayPath = file.file_path
+      displayPath = displayPath.replace(/^.*data[\\/\\]projects[\\/\\][^\\/\\]+[\\/\\]/, '')
+      
+      const parts = displayPath.split(/[\\/]/)
+      let current = tree
+      
+      parts.forEach((part, index) => {
+        if (!current.children[part]) {
+          current.children[part] = {
+            name: part,
+            children: {},
+            isFile: index === parts.length - 1,
+            file: index === parts.length - 1 ? file : null
+          }
+        }
+        current = current.children[part]
+      })
+    })
+    
+    return tree.children
+  }
+
+  const renderTree = (node: any, level: number = 0) => {
+    return Object.entries(node).map(([name, item]) => {
+      const isExpanded = expandedFiles.has(item.file?.file_path || name)
       
       return (
-        <div key={`${file.file_path}-${idx}`} className="py-0.5">
+        <div key={name} className="py-0.5">
           <div 
             className="flex items-center gap-2 py-1.5 px-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
             style={{ paddingLeft: `${level * 12 + 8}px` }}
-            onClick={() => hasChildren && toggleFile(file.file_path)}
+            onClick={() => !item.isFile && toggleFile(item.file?.file_path || name)}
           >
-            {hasChildren && (
+            {!item.isFile && Object.keys(item.children).length > 0 && (
               <svg className={`w-3 h-3 text-gray-400 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             )}
             <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              {item.isFile ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              )}
             </svg>
-            <span className="text-sm text-gray-900 truncate">{file.file_path}</span>
+            <span className="text-sm text-gray-900 truncate">
+              {project?.name && level === 0 ? project.name + '\\' + name : name}
+            </span>
           </div>
-          {isExpanded && (
-            <>
-               {file.functions && file.functions.length > 0 && (
+          {!item.isFile && isExpanded && Object.keys(item.children).length > 0 && (
+            <div className="ml-4">
+              {renderTree(item.children, level + 1)}
+            </div>
+          )}
+          {item.isFile && isExpanded && item.file && (
+            <div className="ml-4">
+              {item.file.functions && item.file.functions.length > 0 && (
                 <div className="pl-6">
-                  {file.functions.slice(0, 10).map((func: any, fIdx: number) => (
+                  {item.file.functions.slice(0, 10).map((func: any, fIdx: number) => (
                     <div key={fIdx} className="flex items-center gap-2 py-1 px-2 text-xs text-gray-600 hover:bg-gray-50 rounded">
                       <svg className="w-3 h-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
@@ -109,16 +152,16 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
                       <span className="truncate" title={func.name}>{func.name}</span>
                     </div>
                   ))}
-                  {file.functions.length > 10 && (
+                  {item.file.functions.length > 10 && (
                     <div className="py-1 px-2 text-xs text-gray-400 pl-6">
-                      ... 还有 {file.functions.length - 10} 个函数
+                      ... 还有 {item.file.functions.length - 10} 个函数
                     </div>
                   )}
                 </div>
               )}
-              {file.classes && file.classes.length > 0 && (
+              {item.file.classes && item.file.classes.length > 0 && (
                 <div className="pl-6">
-                  {file.classes.slice(0, 5).map((cls: any, cIdx: number) => (
+                  {item.file.classes.slice(0, 5).map((cls: any, cIdx: number) => (
                     <div key={cIdx} className="py-1">
                       <div className="flex items-center gap-2 py-1 px-2 text-xs text-gray-600 hover:bg-gray-50 rounded font-medium">
                         <svg className="w-3 h-3 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,14 +179,14 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
                       ))}
                     </div>
                   ))}
-                  {file.classes.length > 5 && (
+                  {item.file.classes.length > 5 && (
                     <div className="py-1 px-2 text-xs text-gray-400 pl-6">
-                      ... 还有 {file.classes.length - 5} 个类
+                      ... 还有 {item.file.classes.length - 5} 个类
                     </div>
                   )}
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       )
@@ -152,7 +195,6 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
 
   const tabs = [
     { id: 'structure', label: '项目结构', icon: '📁' },
-    { id: 'callgraph', label: '调用图', icon: '🔀' },
     { id: 'dependencies', label: '依赖关系', icon: '🔗' },
     { id: 'summary', label: '项目摘要', icon: '📊' },
   ]
@@ -212,128 +254,106 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
           </div>
         )}
 
-        {activeTab === 'callgraph' && callGraph && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">函数调用关系</h3>
-              <div className="flex gap-4 text-sm text-gray-600">
-                <span>节点: {callGraph.nodes?.length || 0}</span>
-                <span>边: {callGraph.edges?.length || 0}</span>
-                <span>入口点: {callGraph.entry_points?.length || 0}</span>
-              </div>
-            </div>
-            <div className="grid gap-4">
-               <div className="bg-gray-50 rounded-xl p-4">
-                 <h4 className="text-sm font-semibold text-gray-900 mb-3">入口函数 ({callGraph.entry_points?.length || 0})</h4>
-                 {(callGraph.entry_points?.length || 0) > 0 ? (
-                   <div className="flex flex-wrap gap-2">
-                     {(callGraph.entry_points || []).slice(0, 20).map((entry, idx) => (
-                       <span key={idx} className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 hover:bg-blue-200 transition-colors" title={entry}>
-                         {entry}
-                       </span>
-                     ))}
-                     {(callGraph.entry_points?.length || 0) > 20 && (
-                       <div className="text-xs text-gray-500 self-center py-1.5">
-                         ... 还有 {(callGraph.entry_points?.length || 0) - 20} 个入口点
-                       </div>
-                     )}
-                   </div>
-                 ) : (
-                   <div className="text-sm text-gray-500">暂无入口点</div>
-                 )}
-               </div>
-               <div className="bg-gray-50 rounded-xl p-4">
-                 <h4 className="text-sm font-semibold text-gray-900 mb-3">函数节点</h4>
-                 {(callGraph.nodes?.length || 0) > 0 ? (
-                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 max-h-80 overflow-auto">
-                     {(callGraph.nodes || []).slice(0, 50).map((node, idx) => {
-                       const isEntryPoint = (callGraph.entry_points || []).includes(node.id || node.name)
-                       const edgeCount = (callGraph.edges || []).filter(
-                         (e: any) => e.source === (node.id || node.name)
-                       ).length
-                        
-                       return (
-                         <div 
-                           key={idx} 
-                           className="flex items-center gap-2 p-2 text-xs bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all"
-                           title={`${node.name} - ${edgeCount} 个调用`}
-                         >
-                           <span className="flex-1 truncate font-medium text-gray-900">{node.name}</span>
-                           <span className="text-gray-400">{node.type}</span>
-                           <span className="text-blue-600 font-semibold">{edgeCount}</span>
-                           {isEntryPoint && (
-                             <span className="text-green-600">🚀</span>
-                           )}
-                         </div>
-                       )
-                     })}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">暂无函数节点</div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
         {activeTab === 'dependencies' && dependencies && (
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">依赖关系分析</h3>
               <div className="flex gap-4 text-sm text-gray-600">
-                <span>内部模块: {dependencies.internal_modules?.length || 0}</span>
-                <span>外部依赖: {dependencies.external_modules?.length || 0}</span>
+                <span>内部模块: {dependencies.graph?.stats?.internal_modules || 0}</span>
+                <span>外部依赖: {dependencies.graph?.stats?.external_modules || 0}</span>
               </div>
             </div>
             <div className="grid gap-4">
               <div className="bg-gray-50 rounded-xl p-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">内部模块 ({dependencies.internal_modules?.length || 0})</h4>
-                {(dependencies.internal_modules?.length || 0) > 0 ? (
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-gray-900">内部模块 ({dependencies.graph?.stats?.internal_modules || 0})</h4>
+                  <button
+                    onClick={() => toggleSection('internalModules')}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className={`w-4 h-4 transition-transform ${expandedSections.internalModules ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+                {expandedSections.internalModules && Object.keys(dependencies.graph?.internal_modules || {}).length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {(dependencies.internal_modules || []).slice(0, 20).map((mod, idx) => (
+                    {Object.keys(dependencies.graph?.internal_modules || {}).slice(0, expandedSections.showAllInternal ? undefined : 20).map((mod, idx) => (
                       <span key={idx} className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 hover:bg-purple-200 transition-colors" title={`模块: ${mod}`}>
                         {mod}
                       </span>
                     ))}
-                    {(dependencies.internal_modules?.length || 0) > 20 && (
-                      <div className="text-xs text-gray-500 self-center py-1.5">
-                        ... 还有 {(dependencies.internal_modules?.length || 0) - 20} 个模块
-                      </div>
+                    {Object.keys(dependencies.graph?.internal_modules || {}).length > 20 && !expandedSections.showAllInternal && (
+                      <button
+                        onClick={() => toggleShowAll('internal')}
+                        className="text-xs text-blue-600 hover:text-blue-700 transition-colors cursor-pointer self-center py-1.5"
+                      >
+                        ... 还有 {Object.keys(dependencies.graph?.internal_modules || {}).length - 20} 个模块 (点击展开)
+                      </button>
+                    )}
+                    {expandedSections.showAllInternal && Object.keys(dependencies.graph?.internal_modules || {}).length > 20 && (
+                      <button
+                        onClick={() => toggleShowAll('internal')}
+                        className="text-xs text-blue-600 hover:text-blue-700 transition-colors cursor-pointer self-center py-1.5"
+                      >
+                        (收起)
+                      </button>
                     )}
                   </div>
-                ) : (
+                ) : Object.keys(dependencies.graph?.internal_modules || {}).length === 0 ? (
                   <div className="text-sm text-gray-500">暂无内部模块</div>
-                )}
+                ) : null}
               </div>
               <div className="bg-gray-50 rounded-xl p-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-3">外部依赖 ({dependencies.external_modules?.length || 0})</h4>
-                {(dependencies.external_modules?.length || 0) > 0 ? (
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-gray-900">外部依赖 ({dependencies.graph?.stats?.external_modules || 0})</h4>
+                  <button
+                    onClick={() => toggleSection('externalModules')}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className={`w-4 h-4 transition-transform ${expandedSections.externalModules ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+                {expandedSections.externalModules && Object.keys(dependencies.graph?.external_modules || {}).length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {(dependencies.external_modules || []).slice(0, 20).map((dep, idx) => (
+                    {Object.keys(dependencies.graph?.external_modules || {}).slice(0, expandedSections.showAllExternal ? undefined : 20).map((dep, idx) => (
                       <span key={idx} className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-green-100 text-green-800 hover:bg-green-200 transition-colors" title={`依赖: ${dep}`}>
                         {dep}
                       </span>
                     ))}
-                    {(dependencies.external_modules?.length || 0) > 20 && (
-                      <div className="text-xs text-gray-500 self-center py-1.5">
-                        ... 还有 {(dependencies.external_modules?.length || 0) - 20} 个依赖
-                      </div>
+                    {Object.keys(dependencies.graph?.external_modules || {}).length > 20 && !expandedSections.showAllExternal && (
+                      <button
+                        onClick={() => toggleShowAll('external')}
+                        className="text-xs text-blue-600 hover:text-blue-700 transition-colors cursor-pointer self-center py-1.5"
+                      >
+                        ... 还有 {Object.keys(dependencies.graph?.external_modules || {}).length - 20} 个依赖 (点击展开)
+                      </button>
+                    )}
+                    {expandedSections.showAllExternal && Object.keys(dependencies.graph?.external_modules || {}).length > 20 && (
+                      <button
+                        onClick={() => toggleShowAll('external')}
+                        className="text-xs text-blue-600 hover:text-blue-700 transition-colors cursor-pointer self-center py-1.5"
+                      >
+                        (收起)
+                      </button>
                     )}
                   </div>
-                ) : (
+                ) : Object.keys(dependencies.graph?.external_modules || {}).length === 0 ? (
                   <div className="text-sm text-gray-500">暂无外部依赖</div>
-                )}
+                ) : null}
               </div>
-              {(dependencies.graph?.circular_dependencies || []).length > 0 && (
+              {dependencies.circular_dependencies?.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
                   <h4 className="text-sm font-semibold text-amber-900 mb-3 flex items-center gap-2">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    检测到循环依赖 ({(dependencies.graph?.circular_dependencies || []).length})
+                    检测到循环依赖 ({dependencies.circular_dependencies?.length || 0})
                   </h4>
                   <div className="space-y-2">
-                    {(dependencies.graph?.circular_dependencies || []).slice(0,5).map((cycle: any, idx: number) => (
+                    {(dependencies.circular_dependencies || []).slice(0,5).map((cycle: any, idx: number) => (
                       <div key={idx} className="text-xs text-amber-700 font-mono bg-amber-100 rounded p-2 hover:bg-amber-200 transition-colors" title={cycle.join(' → ')}>
                         {cycle.join(' → ')}
                       </div>
@@ -398,18 +418,22 @@ export default function ParserAnalysis({ projectId }: ParserAnalysisProps) {
               <div className="mt-4 bg-gray-50 rounded-xl p-4">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">语言分布</h4>
                 <div className="space-y-2">
-                  {Object.entries(summary.structure.by_language).map(([lang, count]: [string, any]) => (
-                    <div key={lang} className="flex items-center gap-3">
-                      <span className="text-sm text-gray-900 w-24">{lang}</span>
-                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
-                          style={{ width: `${(count / summary.structure.total_files) * 100}%` }}
-                        ></div>
+                  {Object.entries(summary.structure.by_language).map(([lang, count]: [string, any]) => {
+                    const percentage = ((count / summary.structure.total_files) * 100).toFixed(1)
+                    return (
+                      <div key={lang} className="flex items-center gap-3">
+                        <span className="text-sm text-gray-900 w-24">{lang}</span>
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
+                            style={{ width: `${(count / summary.structure.total_files) * 100}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-600 w-12 text-right">{count}</span>
+                        <span className="text-sm text-gray-500 w-16 text-right">{percentage}%</span>
                       </div>
-                      <span className="text-sm text-gray-600 w-12 text-right">{count}</span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}

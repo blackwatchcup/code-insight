@@ -201,6 +201,19 @@ class RAGService:
             "active_sessions": len(self.history_manager.get_session_ids()),
         }
 
+    async def generate_project_summary(
+        self,
+        project_id: str,
+        top_k: int = 20,
+    ) -> Dict[str, Any]:
+        """Generate a comprehensive summary of a project."""
+        summary_response = await self.qa_service.generate_project_summary(
+            project_id=project_id,
+            top_k=top_k,
+        )
+        return summary_response.to_dict()
+
+
 
 _rag_service: Optional[RAGService] = None
 

@@ -5,6 +5,7 @@ from app.models.feature import Feature
 from app.models.file import File
 from app.models.project import Project, ProjectStatus, SourceType
 from app.models.user import User, UserRole
+from app.models.version import Version
 
 __all__ = [
     "Base",
@@ -17,4 +18,5 @@ __all__ = [
     "Feature",
     "User",
     "UserRole",
+    "Version",
 ]

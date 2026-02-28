@@ -62,6 +62,7 @@ interface ChatStore {
   listSessions: (projectId?: string, limit?: number, offset?: number) => Promise<ChatSession[]>
   deleteSession: (sessionId: string) => Promise<boolean>
   getStats: () => Promise<any>
+  getProjectSummary: (projectId: string, topK?: number) => Promise<any>
 }
 
 export const useChatStore = create<ChatStore>((set) => ({
@@ -258,6 +259,23 @@ export const useChatStore = create<ChatStore>((set) => ({
     } catch (err) {
       console.error('Get stats error:', err)
       return null
+    }
+  },
+  
+  getProjectSummary: async (projectId: string, topK: number = 20) => {
+    set({ isLoading: true, error: null })
+    try {
+      const res = await api.get(`/chat/project-summary/${projectId}`, {
+        params: { top_k: topK },
+      })
+      set({ isLoading: false })
+      return res.data.data
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { detail?: string } }; message?: string }
+      const errorMessage = errorObj.response?.data?.detail || errorObj.message || 'Failed to generate project summary'
+      console.error('Get project summary error:', err)
+      set({ error: errorMessage, isLoading: false })
+      throw new Error(errorMessage)
     }
   },
 }))

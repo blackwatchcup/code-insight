@@ -4,9 +4,10 @@ import type { FeatureNode, APIEndpoint, DataModel } from '../types'
 
 interface FeatureAnalysisProps {
   projectId: string
+  project?: any
 }
 
-export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
+export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisProps) {
   const [activeTab, setActiveTab] = useState('tree')
   const [featureTree, setFeatureTree] = useState<FeatureNode | null>(null)
   const [frontendFeatures, setFrontendFeatures] = useState<FeatureNode[]>([])
@@ -15,6 +16,21 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
   const [dataModels, setDataModels] = useState<DataModel[]>([])
   
   const { getFeatureTree, getFrontendFeatures, getBackendFeatures, getApiEndpoints, getDataModels, isLoading, error } = useFeatureStore()
+
+  const formatFilePath = (filePath: string) => {
+    // 移除路径前缀，只显示相对路径，并使用项目名称作为根目录
+    let displayPath = filePath
+    
+    // 移除 data/projects/xxx/ 前缀（处理不同的路径分隔符）
+    displayPath = displayPath.replace(/^.*data[\\/\\]projects[\\/\\][^\\/\\]+[\\/\\]/, '')
+    
+    // 使用项目名称作为根目录
+    if (project?.name) {
+      displayPath = `${project.name}\\${displayPath}`
+    }
+    
+    return displayPath
+  }
 
   useEffect(() => {
     loadFeatures()
@@ -135,7 +151,7 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
                     </svg>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900">{feature.name}</div>
-                      <div className="text-xs text-gray-500">{feature.file_path}</div>
+                      <div className="text-xs text-gray-500">{formatFilePath(feature.file_path)}</div>
                     </div>
                     <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-full">{feature.type}</span>
                   </div>
@@ -162,7 +178,7 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
                     </svg>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-gray-900">{feature.name}</div>
-                      <div className="text-xs text-gray-500">{feature.file_path}</div>
+                      <div className="text-xs text-gray-500">{formatFilePath(feature.file_path)}</div>
                     </div>
                     <span className="text-xs text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full">{feature.type}</span>
                   </div>
@@ -202,7 +218,7 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 font-mono">{api.path}</td>
-                        <td className="px-4 py-3 text-sm text-gray-500">{api.file_path}</td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{formatFilePath(api.file_path)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -226,7 +242,7 @@ export default function FeatureAnalysis({ projectId }: FeatureAnalysisProps) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                       </svg>
                       <span className="text-sm font-semibold text-gray-900">{model.name}</span>
-                      <span className="text-xs text-gray-500 ml-auto">{model.file_path}</span>
+                      <span className="text-xs text-gray-500 ml-auto">{formatFilePath(model.file_path)}</span>
                     </div>
                     <div className="space-y-1">
                       {(model.fields || []).map((field, fieldIdx) => (

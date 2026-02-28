@@ -39,7 +39,7 @@ export default function Chat() {
 
   useEffect(() => {
     loadSessions()
-  }, [])
+  }, [selectedProjectId])
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -98,7 +98,7 @@ export default function Chat() {
 
   const loadSessions = async () => {
     try {
-      const sessionList = await listSessions(undefined, 50, 0)
+      const sessionList = await listSessions(selectedProjectId || undefined, 50, 0)
       setSessions(sessionList || [])
     } catch (err) {
       console.error('Failed to load sessions:', err)

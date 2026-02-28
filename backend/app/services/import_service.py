@@ -1,4 +1,5 @@
 import os
+import shutil
 import tempfile
 import uuid
 import zipfile
@@ -26,18 +27,28 @@ class ImportService:
         name: Optional[str] = None,
         owner_id: Optional[str] = None,
     ) -> Project:
-        project_id = str(uuid.uuid4())[:8]
+        if not name:
+            name = self._extract_name(url)
+        
+        # 使用项目名称作为目录名（清理特殊字符）
+        project_dir_name = self._sanitize_directory_name(name)
         projects_dir = Path(settings.PROJECTS_DIR)
         projects_dir.mkdir(parents=True, exist_ok=True)
-        project_dir = projects_dir / project_id
+        
+        # 确保目录名唯一
+        project_dir = self._get_unique_directory(projects_dir, project_dir_name)
+        
+        project_id = project_dir.name
 
         if token and "github.com" in url:
             url = url.replace("github.com", f"{token}@github.com")
 
-        git.Repo.clone_from(url, project_dir, branch=branch, depth=depth)
-
-        if not name:
-            name = self._extract_name(url)
+        actual_branch = self._get_default_branch(url, branch)
+        
+        if actual_branch:
+            git.Repo.clone_from(url, project_dir, branch=actual_branch, depth=depth)
+        else:
+            git.Repo.clone_from(url, project_dir, depth=depth)
 
         file_count, line_count = self._count_files_and_lines(project_dir)
 
@@ -63,10 +74,18 @@ class ImportService:
     async def import_from_zip(
         self, url: str, name: Optional[str] = None, owner_id: Optional[str] = None
     ) -> Project:
-        project_id = str(uuid.uuid4())[:8]
+        if not name:
+            name = self._extract_name(url)
+        
+        # 使用项目名称作为目录名（清理特殊字符）
+        project_dir_name = self._sanitize_directory_name(name)
         projects_dir = Path(settings.PROJECTS_DIR)
         projects_dir.mkdir(parents=True, exist_ok=True)
-        project_dir = projects_dir / project_id
+        
+        # 确保目录名唯一
+        project_dir = self._get_unique_directory(projects_dir, project_dir_name)
+        
+        project_id = project_dir.name
 
         response = requests.get(url, stream=True)
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
@@ -80,9 +99,6 @@ class ImportService:
                 zip_ref.extractall(project_dir)
 
             self._flatten_directory(project_dir)
-
-            if not name:
-                name = self._extract_name(url)
 
             file_count, line_count = self._count_files_and_lines(project_dir)
 
@@ -108,6 +124,55 @@ class ImportService:
 
     def _extract_name(self, url: str) -> str:
         return url.rstrip("/").split("/")[-1].replace(".git", "")
+
+    def _sanitize_directory_name(self, name: str) -> str:
+        """Sanitize project name to use as directory name."""
+        import re
+        # Remove or replace invalid characters
+        name = re.sub(r'[<>:"/\\|?*]', '_', name)
+        # Remove leading/trailing whitespace
+        name = name.strip()
+        # Limit length
+        name = name[:50]
+        # Ensure it's not empty
+        if not name:
+            name = "project"
+        return name
+
+    def _get_unique_directory(self, base_dir: Path, dir_name: str) -> Path:
+        """Get a unique directory path by appending numbers if necessary."""
+        counter = 1
+        unique_name = dir_name
+        
+        while (base_dir / unique_name).exists():
+            unique_name = f"{dir_name}_{counter}"
+            counter += 1
+        
+        return base_dir / unique_name
+
+    def _get_default_branch(self, url: str, preferred_branch: str = "main") -> Optional[str]:
+        try:
+            from git import Repo
+            repo = Repo.clone_from(url, Path(tempfile.gettempdir()) / f"temp_git_check_{uuid.uuid4().hex[:8]}", depth=1, branch=preferred_branch)
+            repo.git.clear_cache()
+            shutil.rmtree(repo.working_dir, ignore_errors=True)
+            return preferred_branch
+        except Exception:
+            pass
+        
+        for branch in ["master", "main", "develop", "dev"]:
+            if branch == preferred_branch:
+                continue
+            try:
+                from git import Repo
+                temp_dir = Path(tempfile.gettempdir()) / f"temp_git_check_{uuid.uuid4().hex[:8]}"
+                repo = Repo.clone_from(url, temp_dir, depth=1, branch=branch)
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                return branch
+            except Exception:
+                continue
+        
+        return None
 
     def _detect_source_type(self, url: str) -> SourceType:
         if "github.com" in url:

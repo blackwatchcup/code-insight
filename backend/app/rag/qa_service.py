@@ -89,6 +89,22 @@ Instructions:
 Answer:"""
 
 
+PROJECT_SUMMARY_PROMPT = """You are a software architect. Analyze the provided codebase context and create a comprehensive project summary.
+
+Context from codebase:
+{context}
+
+Instructions:
+1. Provide a high-level overview of the project's purpose and main functionality
+2. Identify the technology stack (languages, frameworks, libraries)
+3. Describe the overall architecture and key components
+4. List main features and capabilities
+5. Note any important patterns or design decisions
+6. Include specific file references where relevant
+
+Project Summary:"""
+
+
 FREEFORM_PROMPT = """You are a helpful AI assistant. Have a natural conversation with the user.
 
 User Message: {question}
@@ -327,3 +343,33 @@ class QAService:
             base_confidence += 0.1
 
         return min(base_confidence, 1.0)
+
+    async def generate_project_summary(
+        self,
+        project_id: str,
+        top_k: int = 20,
+    ) -> QAResponse:
+        """Generate a comprehensive summary of the project."""
+        # Retrieve a broad set of code chunks from the project
+        sources = self.retriever.retrieve(
+            "project overview main features architecture components",
+            top_k=top_k,
+            project_id=project_id,
+        )
+        
+        context = self._build_context(sources)
+        prompt = PROJECT_SUMMARY_PROMPT.format(context=context)
+        
+        answer = await self.llm.generate(prompt)
+        
+        confidence = self._calculate_confidence(sources, answer)
+        
+        return QAResponse(
+            answer=answer,
+            qa_type=QAType.HYBRID,
+            sources=sources,
+            citations=[],
+            confidence=confidence,
+            metadata={"type": "project_summary", "project_id": project_id},
+        )
+

@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     OPENAI_BASE_URL: str = "https://api.deepseek.com"
     CLAUDE_API_KEY: str = ""
 
+    anythingllm_base_url: str = "http://localhost:3001"
+    anythingllm_api_key: str = ""
+    anythingllm_timeout: int = 120
+    anythingllm_workspace_prefix: str = "codeinsight"
+    chat_backend: str = "anythingllm"
+
     EMBEDDING_MODEL: str = "local"
     EMBEDDING_BASE_URL: Optional[str] = None
     EMBEDDING_USE_LOCAL: bool = True

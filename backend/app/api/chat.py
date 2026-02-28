@@ -260,3 +260,19 @@ async def get_stats(
 ):
     stats = rag_service.get_stats()
     return {"code": 200, "data": stats}
+
+
+@router.get("/project-summary/{project_id}", tags=["Chat"])
+async def get_project_summary(
+    project_id: str,
+    top_k: int = Query(20, ge=5, le=50),
+    current_user: Optional[User] = Depends(get_current_user),
+    rag_service: RAGService = Depends(get_rag_service),
+):
+    """Generate a comprehensive summary of a project."""
+    summary = await rag_service.generate_project_summary(
+        project_id=project_id,
+        top_k=top_k,
+    )
+    return {"code": 200, "data": summary}
+

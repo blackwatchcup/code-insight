@@ -13,6 +13,7 @@ from app.api.features import router as features_router
 from app.api.graph import router as graph_router
 from app.api.parser import router as parser_router
 from app.api.projects import router as projects_router
+from app.api.versions import router as versions_router
 from app.core.config import settings
 from app.core.error_handler import (
     codeinsight_exception_handler,
@@ -57,6 +58,7 @@ app.include_router(features_router, prefix="/api/v1/features")
 app.include_router(chat_router, prefix="/api/v1/chat")
 app.include_router(graph_router, prefix="/api/v1")
 app.include_router(docs_router, prefix="/api/v1")
+app.include_router(versions_router, prefix="/api/v1/projects")
 
 
 @app.get("/health")

@@ -4,6 +4,7 @@ import { useProjectStore } from '../stores/projectStore'
 import { useChatStore } from '../stores/chatStore'
 import FeatureAnalysis from '../components/FeatureAnalysis'
 import ParserAnalysis from '../components/ParserAnalysis'
+import VersionComparison from '../components/VersionComparison'
 import Chat from './Chat'
 
 export default function ProjectDetail() {
@@ -72,6 +73,7 @@ export default function ProjectDetail() {
     { id: 'overview', label: '项目概览', icon: '📊' },
     { id: 'parser', label: '代码结构', icon: '🔍' },
     { id: 'features', label: '功能分析', icon: '🎯' },
+    { id: 'versions', label: '版本对比', icon: '🔄' },
     { id: 'chat', label: '智能问答', icon: '💬' },
   ]
 
@@ -120,8 +122,8 @@ export default function ProjectDetail() {
             </svg>
             返回项目列表
           </button>
-          <h1 className="text-2xl font-bold text-gray-900">{project.name}</h1>
-          <p className="text-gray-500 text-sm mt-1">{project.source_type === 'local' ? '本地目录' : project.source_type.toUpperCase()}</p>
+          <h1 className="text-2xl font-bold text-gray-900">{project?.name ?? '未命名项目'}</h1>
+          <p className="text-gray-500 text-sm mt-1">{project?.source_type === 'local' ? '本地目录' : project?.source_type?.toUpperCase() ?? '未知来源'}</p>
         </div>
         <div className="flex gap-2">
           <button
@@ -156,7 +158,7 @@ export default function ProjectDetail() {
               </div>
               <span className="text-sm text-blue-600 font-medium">文件数</span>
             </div>
-            <div className="text-2xl font-bold text-blue-900">{project.file_count.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-blue-900">{(project?.file_count ?? 0).toLocaleString()}</div>
           </div>
 
           <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-5">
@@ -168,7 +170,7 @@ export default function ProjectDetail() {
               </div>
               <span className="text-sm text-indigo-600 font-medium">代码行数</span>
             </div>
-            <div className="text-2xl font-bold text-indigo-900">{project.line_count.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-indigo-900">{(project?.line_count ?? 0).toLocaleString()}</div>
           </div>
 
           <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5">
@@ -181,7 +183,7 @@ export default function ProjectDetail() {
               <span className="text-sm text-purple-600 font-medium">状态</span>
             </div>
             <div className="text-lg font-bold text-purple-900">
-              {project.status === 'ready' ? '就绪' : project.status === 'error' ? '错误' : '索引中'}
+              {project?.status === 'ready' ? '就绪' : project?.status === 'error' ? '错误' : project?.status === 'indexing' ? '索引中' : '未知'}
             </div>
           </div>
 
@@ -195,7 +197,7 @@ export default function ProjectDetail() {
               <span className="text-sm text-gray-600 font-medium">创建时间</span>
             </div>
             <div className="text-sm font-semibold text-gray-900">
-              {new Date(project.created_at).toLocaleDateString('zh-CN')}
+              {project?.created_at ? new Date(project.created_at).toLocaleDateString('zh-CN') : '未知'}
             </div>
           </div>
         </div>
@@ -225,7 +227,7 @@ export default function ProjectDetail() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">项目路径</h3>
                 <div className="bg-gray-50 rounded-xl p-4 font-mono text-sm text-gray-700">
-                  {project.local_path || project.source_url}
+                  {project?.local_path || project?.source_url || '路径未设置'}
                 </div>
               </div>
               {project.source_url && (
@@ -247,9 +249,11 @@ export default function ProjectDetail() {
             </div>
           )}
 
-          {activeTab === 'parser' && <ParserAnalysis projectId={id!} />}
+          {activeTab === 'parser' && <ParserAnalysis projectId={id!} project={project} />}
           
-          {activeTab === 'features' && <FeatureAnalysis projectId={id!} />}
+          {activeTab === 'features' && <FeatureAnalysis projectId={id!} project={project} />}
+          
+          {activeTab === 'versions' && <VersionComparison projectId={id!} />}
           
           {activeTab === 'chat' && (
             <div className="h-full">

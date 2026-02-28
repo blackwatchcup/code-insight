@@ -1,5 +1,6 @@
 from typing import Optional
 
+import git
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -80,19 +81,24 @@ async def import_project(
     import_service = ImportService(db)
     owner_id = current_user.id if current_user else None
 
-    if request.type == "zip":
-        project = await import_service.import_from_zip(request.url, request.name, owner_id)
-    else:
-        project = await import_service.import_from_git(
-            url=request.url,
-            branch=request.branch,
-            token=request.token,
-            depth=request.depth,
-            name=request.name,
-            owner_id=owner_id,
-        )
+    try:
+        if request.type == "zip":
+            project = await import_service.import_from_zip(request.url, request.name, owner_id)
+        else:
+            project = await import_service.import_from_git(
+                url=request.url,
+                branch=request.branch,
+                token=request.token,
+                depth=request.depth,
+                name=request.name,
+                owner_id=owner_id,
+            )
 
-    return {"code": 200, "data": project.to_dict()}
+        return {"code": 200, "data": project.to_dict()}
+    except git.exc.GitCommandError as e:
+        raise HTTPException(400, f"Git clone failed: {str(e)}. Please check if the repository URL is correct and the branch exists.")
+    except Exception as e:
+        raise HTTPException(400, f"Import failed: {str(e)}")
 
 
 @router.get("/{project_id}", tags=["Projects"])
