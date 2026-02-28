@@ -120,9 +120,10 @@ class RAGService:
         top_k: int = 5,
         chat_mode: str = "project",
         llm_config: Optional[LLMConfig] = None,
+        db: Optional[Any] = None,
     ) -> QAResponse:
         llm = LLMService(llm_config) if llm_config else self.llm
-        qa_service = QAService(llm, self.retriever, self.history_manager)
+        qa_service = QAService(llm, self.retriever, self.history_manager, db=db)
         return await qa_service.answer(
             question=question,
             qa_type=qa_type,
@@ -141,9 +142,10 @@ class RAGService:
         top_k: int = 5,
         chat_mode: str = "project",
         llm_config: Optional[LLMConfig] = None,
+        db: Optional[Any] = None,
     ) -> AsyncGenerator[str, None]:
         llm = LLMService(llm_config) if llm_config else self.llm
-        qa_service = QAService(llm, self.retriever, self.history_manager)
+        qa_service = QAService(llm, self.retriever, self.history_manager, db=db)
         async for chunk in qa_service.answer_stream(
             question=question,
             qa_type=qa_type,

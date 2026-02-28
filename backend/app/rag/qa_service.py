@@ -3,10 +3,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from sqlalchemy.orm import Session
+
 from app.llm.service import LLMService
 from app.rag.database_chat_history import DatabaseChatHistoryManager
 from app.rag.citation import Citation, CitationExtractor
 from app.rag.retriever import RetrievalResult, SemanticRetriever
+from app.services.project_service import ProjectService
 
 
 class QAType(str, Enum):
@@ -152,11 +155,14 @@ class QAService:
         retriever: SemanticRetriever,
         history_manager: Optional[DatabaseChatHistoryManager] = None,
         citation_extractor: Optional[CitationExtractor] = None,
+        db: Optional[Session] = None,
     ):
         self.llm = llm
         self.retriever = retriever
         self.history_manager = history_manager or DatabaseChatHistoryManager()
         self.citation_extractor = citation_extractor or CitationExtractor()
+        self.db = db
+        self.project_service = ProjectService(db) if db else None
 
     async def answer(
         self,
@@ -175,6 +181,20 @@ class QAService:
                 chat_mode=chat_mode,
             )
 
+        # Retrieve project metadata if in project mode with valid project_id
+        project_context = ""
+        if chat_mode == "project" and project_id and project_id.strip() and self.project_service:
+            try:
+                project = self.project_service.get_project(project_id)
+                if project:
+                    project_context = self._format_project_context(project)
+                else:
+                    import logging
+                    logging.warning(f"Project not found for project_id: {project_id}")
+            except Exception as e:
+                import logging
+                logging.warning(f"Failed to retrieve project metadata: {e}")
+
         # For free-form mode, skip RAG retrieval
         if chat_mode == "freeform":
             prompt = FREEFORM_PROMPT.format(context="", question=question)
@@ -186,6 +206,11 @@ class QAService:
 
             sources = self.retriever.retrieve(question, top_k=top_k, project_id=project_id)
             context = self._build_context(sources)
+            
+            # Prepend project context to code context if available
+            if project_context:
+                context = f"{project_context}\n\n{context}"
+            
             prompt = self._get_prompt(qa_type, context, question)
 
         history = None
@@ -244,6 +269,20 @@ class QAService:
                 chat_mode=chat_mode,
             )
 
+        # Retrieve project metadata if in project mode with valid project_id
+        project_context = ""
+        if chat_mode == "project" and project_id and project_id.strip() and self.project_service:
+            try:
+                project = self.project_service.get_project(project_id)
+                if project:
+                    project_context = self._format_project_context(project)
+                else:
+                    import logging
+                    logging.warning(f"Project not found for project_id: {project_id}")
+            except Exception as e:
+                import logging
+                logging.warning(f"Failed to retrieve project metadata: {e}")
+
         # For free-form mode, skip RAG retrieval
         if chat_mode == "freeform":
             prompt = FREEFORM_PROMPT.format(context="", question=question)
@@ -254,6 +293,11 @@ class QAService:
 
             sources = self.retriever.retrieve(question, top_k=top_k, project_id=project_id)
             context = self._build_context(sources)
+            
+            # Prepend project context to code context if available
+            if project_context:
+                context = f"{project_context}\n\n{context}"
+            
             prompt = self._get_prompt(qa_type, context, question)
 
         history = None
@@ -314,6 +358,34 @@ class QAService:
                 f"```\n{source.content}\n```\n"
             )
 
+        return "\n".join(context_parts)
+
+    def _format_project_context(self, project) -> str:
+        """Format project metadata into a context string for LLM.
+        
+        Args:
+            project: Project model instance
+            
+        Returns:
+            Formatted project context string
+        """
+        if not project:
+            return ""
+        
+        context_parts = [
+            "=== Project Information ===",
+            f"Name: {project.name}",
+            f"Source Type: {project.source_type.value if project.source_type else 'unknown'}",
+            f"File Count: {project.file_count}",
+            f"Line Count: {project.line_count}",
+            f"Status: {project.status.value if project.status else 'unknown'}",
+        ]
+        
+        if project.branch:
+            context_parts.append(f"Branch: {project.branch}")
+        
+        context_parts.append("=" * 30)
+        
         return "\n".join(context_parts)
 
     def _get_prompt(self, qa_type: QAType, context: str, question: str) -> str:

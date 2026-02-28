@@ -160,3 +160,32 @@ export interface DependencyGraph {
     most_dependent?: any[]
   }
 }
+
+// 智能聊天相关类型
+export type SmartChatMode = 'smart' | 'full_context' | 'code_only' | 'documentation'
+
+export interface SmartChatResponse {
+  answer: string
+  mode: SmartChatMode
+  context_used: string[]
+  data_needs: {
+    needs: string[]
+    search_keywords: string[]
+    reason: string
+  }
+  sources: ChatSource[]
+  confidence: number
+  metadata: Record<string, any>
+}
+
+export interface ProjectContext {
+  project_id: string
+  project_name: string
+  has_readme: boolean
+  has_summary: boolean
+  tech_stack: string[]
+  file_count: number
+  line_count: number
+  source_type?: string
+  branch?: string
+}

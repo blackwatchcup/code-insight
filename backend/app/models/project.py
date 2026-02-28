@@ -39,6 +39,10 @@ class Project(Base):
     status = Column(Enum(ProjectStatus), default=ProjectStatus.INDEXING)
     file_count = Column(Integer, default=0)
     line_count = Column(Integer, default=0)
+    # 项目上下文字段 - 用于智能聊天
+    readme_content = Column(String, nullable=True)  # README文件内容
+    project_summary = Column(String, nullable=True)  # LLM生成的项目摘要
+    tech_stack = Column(String, nullable=True)  # 技术栈（JSON数组字符串）
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -61,6 +65,9 @@ class Project(Base):
             "status": self.status.value if self.status else None,
             "file_count": self.file_count,
             "line_count": self.line_count,
+            "readme_content": self.readme_content,
+            "project_summary": self.project_summary,
+            "tech_stack": self.tech_stack,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

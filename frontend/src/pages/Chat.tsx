@@ -3,16 +3,31 @@ import { useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import { useChatStore } from '../stores/chatStore'
 import { useProjectStore } from '../stores/projectStore'
-import type { ChatMessage, ChatSession } from '../types'
+import type { ChatMessage, ChatSession, SmartChatMode } from '../types'
+
+const CHAT_MODE_OPTIONS = [
+  { value: 'smart', label: '智能模式', description: 'AI自动分析需要什么数据' },
+  { value: 'full_context', label: '完整上下文', description: '使用所有可用上下文' },
+  { value: 'code_only', label: '仅代码', description: '只使用RAG检索的代码' },
+  { value: 'documentation', label: '文档模式', description: '只使用README和摘要' },
+] as const
 
 export default function Chat() {
   const { projectId } = useParams()
   const { projects, fetchProjects } = useProjectStore()
-  const { ask, getChatHistory, listSessions, deleteSession, error: chatError } = useChatStore()
+  const { 
+    ask, 
+    smartAsk, 
+    getChatHistory, 
+    listSessions, 
+    deleteSession, 
+    error: chatError 
+  } = useChatStore()
   
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projectId || '')
+  const [chatMode, setChatMode] = useState<SmartChatMode>('smart')
   const [sessionId, setSessionId] = useState<string>(() => {
     const existing = sessionStorage.getItem('chat_session_id')
     if (existing) return existing
@@ -155,17 +170,33 @@ export default function Chat() {
     setIsStreaming(true)
 
     try {
-      const response = await ask(input, selectedProjectId, sessionId, undefined, 5)
-      
-      const assistantMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.answer || '',
-        timestamp: new Date().toISOString(),
-        sources: response.sources || [],
-      }
+      // 使用智能聊天模式
+      if (selectedProjectId && chatMode !== 'project') {
+        const response = await smartAsk(input, selectedProjectId, sessionId, chatMode, 5)
+        
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: response.answer || '',
+          timestamp: new Date().toISOString(),
+          sources: response.sources || [],
+        }
 
-      setMessages((prev) => [...prev, assistantMessage])
+        setMessages((prev) => [...prev, assistantMessage])
+      } else {
+        // 使用原有聊天模式
+        const response = await ask(input, selectedProjectId, sessionId, undefined, 5)
+        
+        const assistantMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: response.answer || '',
+          timestamp: new Date().toISOString(),
+          sources: response.sources || [],
+        }
+
+        setMessages((prev) => [...prev, assistantMessage])
+      }
       loadSessions()
     } catch (err: any) {
       console.error('Chat error:', err)
@@ -295,16 +326,35 @@ export default function Chat() {
             <select
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="flex-1 max-w-md px-3 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow text-sm"
+              className="flex-1 max-w-xs px-3 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow text-sm"
             >
-              <option value="">所有项目</option>
+              <option value="">选择项目</option>
               {(projects || []).map((project) => (
                 <option key={project.id} value={project.id}>
                   {project.name}
                 </option>
               ))}
             </select>
+            
+            <label className="text-sm text-gray-600 font-medium whitespace-nowrap ml-4">模式:</label>
+            <select
+              value={chatMode}
+              onChange={(e) => setChatMode(e.target.value as SmartChatMode)}
+              className="flex-1 max-w-xs px-3 py-2 bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow text-sm"
+            >
+              {CHAT_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
+          
+          {chatMode !== 'project' && (
+            <div className="text-xs text-gray-500 bg-blue-50 px-3 py-1.5 rounded-lg">
+              {CHAT_MODE_OPTIONS.find(o => o.value === chatMode)?.description}
+            </div>
+          )}
         </div>
 
         <div 

@@ -55,3 +55,46 @@ END FUNCTION
 - **Edge Case**: 用户提供了 project_id 但数据库中不存在该项目
   - **Expected**: 系统应优雅处理，记录警告但继续处理（仅使用 RAG 结果）
 
+## Expected Behavior
+
+### Preservation Requirements
+
+**Unchanged Behaviors:**
+- 自由模式（chat_mode="freeform"）下的聊天必须继续使用 FREEFORM_PROMPT，不执行 RAG 检索，不添加项目上下文
+- 未提供 project_id 的请求必须继续正常处理，仅使用 RAG 检索结果（如果在项目模式）
+- RAG 检索功能必须继续正常工作，检索到的代码片段格式化逻辑保持不变
+- 聊天历史管理功能必须继续正常工作，历史消息传递给 LLM 的逻辑保持不变
+- 置信度计算、引用提取、会话标题更新等功能必须保持不变
+
+**Scope:**
+所有不满足 bug condition 的输入（chat_mode != "project" 或 project_id 为空）应完全不受此修复影响。这包括：
+- 自由模式下的所有聊天请求
+- 项目模式但未提供 project_id 的请求
+- 所有非聊天相关的功能（项目索引、搜索、分析等）
+
+## Hypothesized Root Cause
+
+基于 bug 描述和代码分析，最可能的原因是：
+
+1. **缺少项目信息获取逻辑**: `QAService` 当前未依赖 `ProjectService`，没有调用 `get_project()` 方法获取项目元数据
+
+2. **提示词构建不完整**: `_build_context()` 方法仅处理 RAG 检索结果，未考虑项目元数据的格式化和添加
+
+3. **设计遗漏**: 初始设计时可能仅关注代码片段检索，未考虑项目整体信息对 LLM 理解的重要性
+
+4. **依赖注入缺失**: `QAService.__init__()` 未接收 `ProjectService` 或数据库 session，无法查询项目信息
+
+## Correctness Properties
+
+Property 1: Fault Condition - Project Context Integration
+
+_For any_ chat request where chat_mode="project" and project_id is not null, the fixed answer() and answer_stream() methods SHALL retrieve project metadata from the database and include it in the LLM prompt context, ensuring the LLM has access to project name, source_type, file_count, line_count, and status information.
+
+**Validates: Requirements 2.1, 2.2, 2.3, 2.4**
+
+Property 2: Preservation - Non-Project Mode Behavior
+
+_For any_ chat request where chat_mode != "project" or project_id is null, the fixed methods SHALL produce exactly the same behavior as the original methods, preserving freeform mode handling, RAG retrieval logic, history management, and all other existing functionality.
+
+**Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5**
+

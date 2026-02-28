@@ -4,7 +4,7 @@ import tempfile
 import uuid
 import zipfile
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import git
 import requests
@@ -51,6 +51,8 @@ class ImportService:
             git.Repo.clone_from(url, project_dir, depth=depth)
 
         file_count, line_count = self._count_files_and_lines(project_dir)
+        readme_content = self._read_readme(project_dir)
+        tech_stack = self._detect_tech_stack(project_dir)
 
         project = Project(
             id=project_id,
@@ -63,6 +65,8 @@ class ImportService:
             status=ProjectStatus.READY,
             file_count=file_count,
             line_count=line_count,
+            readme_content=readme_content,
+            tech_stack=tech_stack,
         )
 
         self.db.add(project)
@@ -101,6 +105,8 @@ class ImportService:
             self._flatten_directory(project_dir)
 
             file_count, line_count = self._count_files_and_lines(project_dir)
+            readme_content = self._read_readme(project_dir)
+            tech_stack = self._detect_tech_stack(project_dir)
 
             project = Project(
                 id=project_id,
@@ -112,6 +118,8 @@ class ImportService:
                 status=ProjectStatus.READY,
                 file_count=file_count,
                 line_count=line_count,
+                readme_content=readme_content,
+                tech_stack=tech_stack,
             )
 
             self.db.add(project)
@@ -221,3 +229,78 @@ class ImportService:
             for item in single_dir.iterdir():
                 item.rename(project_dir / item.name)
             single_dir.rmdir()
+
+    def _read_readme(self, directory: Path) -> Optional[str]:
+        """Read README file content from project directory."""
+        readme_names = ["README.md", "README.rst", "README.txt", "README", "readme.md"]
+        for name in readme_names:
+            readme_path = directory / name
+            if readme_path.exists():
+                try:
+                    content = readme_path.read_text(encoding="utf-8", errors="ignore")
+                    # 限制README内容长度，避免过大
+                    if len(content) > 50000:
+                        content = content[:50000] + "\n... (truncated)"
+                    return content
+                except Exception:
+                    pass
+        return None
+
+    def _detect_tech_stack(self, directory: Path) -> Optional[str]:
+        """Detect technology stack from project files."""
+        tech_indicators = {
+            "Python": ["requirements.txt", "setup.py", "pyproject.toml", "Pipfile"],
+            "JavaScript": ["package.json"],
+            "TypeScript": ["tsconfig.json"],
+            "Go": ["go.mod"],
+            "Java": ["pom.xml", "build.gradle"],
+            "Rust": ["Cargo.toml"],
+            "Vue": ["vue.config.js"],
+            "React": [],  # 需要从package.json判断
+            "Django": [],  # 需要从requirements.txt判断
+            "FastAPI": [],  # 需要从requirements.txt判断
+        }
+        
+        detected = set()
+        
+        # 检查配置文件
+        for tech, files in tech_indicators.items():
+            for file in files:
+                if (directory / file).exists():
+                    detected.add(tech)
+        
+        # 检查package.json中的依赖
+        package_json = directory / "package.json"
+        if package_json.exists():
+            try:
+                import json
+                with open(package_json, "r", encoding="utf-8") as f:
+                    pkg = json.load(f)
+                    deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+                    if "react" in deps or "react-dom" in deps:
+                        detected.add("React")
+                    if "vue" in deps:
+                        detected.add("Vue")
+                    if "next" in deps:
+                        detected.add("Next.js")
+                    if "express" in deps:
+                        detected.add("Express")
+            except Exception:
+                pass
+        
+        # 检查requirements.txt中的依赖
+        requirements = directory / "requirements.txt"
+        if requirements.exists():
+            try:
+                content = requirements.read_text(encoding="utf-8", errors="ignore").lower()
+                if "django" in content:
+                    detected.add("Django")
+                if "fastapi" in content:
+                    detected.add("FastAPI")
+                if "flask" in content:
+                    detected.add("Flask")
+            except Exception:
+                pass
+        
+        import json
+        return json.dumps(list(detected)) if detected else None
