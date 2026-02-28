@@ -125,7 +125,7 @@ class FeatureService:
         }
 
     async def get_backend_features(self, project_path: str) -> Dict:
-        apis: List[APIEndpoint] = []
+        api_dict: Dict[str, APIEndpoint] = {}
         system_features: List[SystemFeature] = []
         models: List[DataModel] = []
 
@@ -142,7 +142,11 @@ class FeatureService:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
 
                 file_apis = self.api_extractor.extract(content, str(file_path))
-                apis.extend(file_apis)
+                # 去重处理 API 端点
+                for api in file_apis:
+                    key = f"{api.method}{api.path}"
+                    if key not in api_dict:
+                        api_dict[key] = api
 
                 file_models = self.model_extractor.extract(content, str(file_path))
                 models.extend(file_models)
@@ -154,13 +158,13 @@ class FeatureService:
                 continue
 
         return {
-            "apis": [a.to_dict() for a in apis],
+            "apis": [a.to_dict() for a in api_dict.values()],
             "system_features": [f.to_dict() for f in system_features],
             "models": [m.to_dict() for m in models],
         }
 
     async def get_api_endpoints(self, project_path: str) -> List[Dict]:
-        apis: List[APIEndpoint] = []
+        api_dict: Dict[str, APIEndpoint] = {}
         project_dir = Path(project_path)
 
         for file_path in project_dir.rglob("*"):
@@ -173,11 +177,16 @@ class FeatureService:
             try:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
                 file_apis = self.api_extractor.extract(content, str(file_path))
-                apis.extend(file_apis)
+                
+                # 去重处理，使用 method + path 作为唯一键
+                for api in file_apis:
+                    key = f"{api.method}{api.path}"
+                    if key not in api_dict:
+                        api_dict[key] = api
             except Exception:
                 continue
 
-        return [a.to_dict() for a in apis]
+        return [a.to_dict() for a in api_dict.values()]
 
     async def get_data_models(self, project_path: str) -> List[Dict]:
         models: List[DataModel] = []

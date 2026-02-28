@@ -250,17 +250,18 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
             <h3 className="text-lg font-semibold text-gray-900 mb-4">API端点 ({apiEndpoints?.length || 0})</h3>
             {apiEndpoints && apiEndpoints.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full border-collapse">
                   <thead>
-                    <tr className="border-b border-gray-200">
+                    <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">方法</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">路径</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">处理函数</th>
                       <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">文件</th>
                     </tr>
                   </thead>
                   <tbody>
                     {(apiEndpoints || []).map((api, idx) => (
-                      <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50">
+                      <tr key={idx} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                             api.method === 'GET' ? 'bg-green-100 text-green-800' :
@@ -273,6 +274,7 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900 font-mono">{api.path}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{api.handler || 'N/A'}</td>
                         <td className="px-4 py-3 text-sm text-gray-500">{formatFilePath(api.file_path)}</td>
                       </tr>
                     ))}

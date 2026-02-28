@@ -68,9 +68,19 @@ export interface FeatureTree {
 export interface APIEndpoint {
   path: string
   method: string
+  handler?: string
   file_path: string
-  line_number: number
+  line: number
   description?: string
+  auth_required?: boolean
+  params?: Array<{
+    name: string
+    type: string
+    required: boolean
+  }>
+  request_body?: string
+  response_model?: string
+  tags?: string[]
 }
 
 export interface DataModel {
