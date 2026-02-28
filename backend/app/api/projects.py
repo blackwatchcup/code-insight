@@ -170,3 +170,26 @@ async def update_project_status(
         return {"code": 200, "data": {"message": "Status updated"}}
     except ValueError:
         raise HTTPException(400, "Invalid status value")
+
+
+@router.get("/{project_id}/info", tags=["Projects"])
+async def get_project_info(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Check access permission
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(403, "Access denied")
+
+    try:
+        info = project_service.get_project_info(project_id)
+        return {"code": 200, "data": info}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to get project info: {str(e)}")

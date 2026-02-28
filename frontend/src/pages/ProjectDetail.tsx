@@ -6,6 +6,8 @@ import FeatureAnalysis from '../components/FeatureAnalysis'
 import ParserAnalysis from '../components/ParserAnalysis'
 import VersionComparison from '../components/VersionComparison'
 import Chat from './Chat'
+import { api } from '../services/api'
+import ReactMarkdown from 'react-markdown'
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>()
@@ -16,10 +18,18 @@ export default function ProjectDetail() {
   const [activeTab, setActiveTab] = useState('overview')
   const [project, setProject] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [projectInfo, setProjectInfo] = useState<{ description: string; architecture: string } | null>(null)
+  const [isLoadingInfo, setIsLoadingInfo] = useState(false)
 
   useEffect(() => {
     loadProject()
   }, [id])
+
+  useEffect(() => {
+    if (project) {
+      loadProjectInfo()
+    }
+  }, [project])
 
   const loadProject = async () => {
     if (!id) return
@@ -28,6 +38,24 @@ export default function ProjectDetail() {
       setProject(data)
     } catch (err: any) {
       setError(err.message || 'Failed to load project')
+    }
+  }
+
+  const loadProjectInfo = async () => {
+    if (!id) return
+    setIsLoadingInfo(true)
+    try {
+      const response = await api.get(`/projects/${id}/info`)
+      setProjectInfo(response.data.data)
+    } catch (err: any) {
+      console.error('Failed to load project info:', err)
+      // 失败时使用默认描述
+      setProjectInfo({
+        description: project?.description || '本地代码仓库智能分析和知识问答系统。CodeInsight 是一个强大的代码分析工具，能够智能分析本地代码仓库，提供代码结构可视化、依赖关系分析、功能提取等功能，并支持基于代码的智能问答。',
+        architecture: '系统采用前后端分离架构，前端使用React + TypeScript + TailwindCSS，后端使用FastAPI + Python，数据库使用SQLite。系统支持代码解析、依赖分析、功能提取、智能问答等核心功能。'
+      })
+    } finally {
+      setIsLoadingInfo(false)
     }
   }
 
@@ -221,13 +249,52 @@ export default function ProjectDetail() {
           ))}
         </div>
 
-        <div className="p-6 h-[calc(100vh-280px)]">
+        <div className="p-6 overflow-y-auto">
           {activeTab === 'overview' && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">项目路径</h3>
-                <div className="bg-gray-50 rounded-xl p-4 font-mono text-sm text-gray-700">
-                  {project?.local_path || project?.source_url || '路径未设置'}
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">项目信息</h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="text-sm text-gray-600 mb-1">项目名称</div>
+                    <div className="text-lg font-semibold text-gray-900">{project?.name || '未命名项目'}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="text-sm text-gray-600 mb-1">项目类型</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {project?.source_type === 'local' ? '本地目录' : project?.source_type?.toUpperCase() || '未知类型'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="text-sm text-gray-600 mb-1">创建时间</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {project?.created_at ? new Date(project.created_at).toLocaleDateString('zh-CN') : '未知'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4">
+                    <div className="text-sm text-gray-600 mb-1">状态</div>
+                    <div className="text-lg font-semibold text-gray-900">
+                      {project?.status === 'ready' ? '就绪' : project?.status === 'error' ? '错误' : project?.status === 'indexing' ? '索引中' : '未知'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">项目描述</h3>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  {isLoadingInfo ? (
+                    <div className="flex items-center justify-center h-24">
+                      <div className="w-8 h-8 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
+                    </div>
+                  ) : (
+                    <div className="text-gray-700 max-h-96 overflow-auto">
+                      <div className="prose min-w-full">
+                        <ReactMarkdown>
+                          {projectInfo?.description || project?.description || '本地代码仓库智能分析和知识问答系统。CodeInsight 是一个强大的代码分析工具，能够智能分析本地代码仓库，提供代码结构可视化、依赖关系分析、功能提取等功能，并支持基于代码的智能问答。'}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               {project.source_url && (
@@ -246,6 +313,45 @@ export default function ProjectDetail() {
                   </a>
                 </div>
               )}
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">项目架构</h3>
+                <div className="bg-gray-50 rounded-xl p-4">
+                  <div className="grid gap-4">
+                    <div className="grid gap-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">文件总数</span>
+                        <span className="font-semibold text-gray-900">{project?.file_count || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">代码行数</span>
+                        <span className="font-semibold text-gray-900">{project?.line_count || 0}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">分支</span>
+                        <span className="font-semibold text-gray-900">{project?.branch || 'main'}</span>
+                      </div>
+                    </div>
+                    <div className="pt-4 border-t border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-900 mb-3">架构图</h4>
+                      <div className="bg-white rounded-lg p-4 border border-gray-200">
+                        {isLoadingInfo ? (
+                          <div className="flex items-center justify-center h-24">
+                            <div className="w-8 h-8 border-4 border-blue-200 rounded-full animate-spin border-t-blue-600"></div>
+                          </div>
+                        ) : (
+                          <div className="text-gray-700 max-h-96 overflow-auto">
+                            <div className="prose min-w-full">
+                              <ReactMarkdown>
+                                {projectInfo?.architecture || '系统采用前后端分离架构，前端使用React + TypeScript + TailwindCSS，后端使用FastAPI + Python，数据库使用SQLite。系统支持代码解析、依赖分析、功能提取、智能问答等核心功能。'}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
