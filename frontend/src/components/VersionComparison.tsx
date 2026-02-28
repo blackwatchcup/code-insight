@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { api } from '../services/api'
 
@@ -86,6 +86,8 @@ export default function VersionComparison({ projectId, isGitRepo = false }: Vers
   const [newGitVersionNumber, setNewGitVersionNumber] = useState('')
   const [newGitVersionDescription, setNewGitVersionDescription] = useState('')
   const [selectedCommitForVersion, setSelectedCommitForVersion] = useState<string>('')
+  const [llmExpanded, setLlmExpanded] = useState(false)
+    const [expandedFiles, setExpandedFiles] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     loadVersions()
@@ -555,16 +557,28 @@ ${detailedChanges}
 
             {/* LLM 生成的变化说明 */}
             <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <h4 className="text-sm font-semibold text-purple-900 mb-3">
-                {isGeneratingSummary ? '生成变化说明中...' : 'LLM 变化说明'}
-              </h4>
+              <div className="flex items-center justify-between cursor-pointer" onClick={() => !isGeneratingSummary && setLlmExpanded(!llmExpanded)}>
+                <h4 className="text-sm font-semibold text-purple-900 mb-3">
+                  {isGeneratingSummary ? '生成变化说明中...' : 'LLM 变化说明'}
+                </h4>
+                {!isGeneratingSummary && (
+                  <span className="text-purple-700">{llmExpanded ? '▼' : '▶'}</span>
+                )}
+              </div>
               <div className="text-sm text-purple-700">
                 {isGeneratingSummary ? (
                   <div className="animate-pulse">正在分析代码变化，请稍候...</div>
                 ) : llmSummary ? (
-                  <div className="prose max-w-none">
-                    <ReactMarkdown>{llmSummary}</ReactMarkdown>
-                  </div>
+                  !llmExpanded ? (
+                    <div className="prose max-w-none">
+                      <p>{llmSummary.substring(0, 300)}...</p>
+                      <p className="text-xs text-purple-600">点击标题查看完整报告</p>
+                    </div>
+                  ) : (
+                    <div className="prose max-w-none">
+                      <ReactMarkdown>{llmSummary}</ReactMarkdown>
+                    </div>
+                  )
                 ) : (
                   <div className="text-gray-500">点击"比较Git提交"按钮后将生成变化说明</div>
                 )}
@@ -572,50 +586,82 @@ ${detailedChanges}
             </div>
 
             {gitDiff.changes.length > 0 && (
-              <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-gray-900">详细变更</h4>
-                <div className="max-h-96 overflow-auto space-y-4">
-                  {gitDiff.changes.map((change, idx) => (
-                    <div key={idx} className="border rounded-lg overflow-hidden">
-                      {/* 文件标题 */}
-                      <div className={`px-4 py-2 font-medium text-sm ${
-                        change.type === 'added'
-                          ? 'bg-green-50 text-green-800 border-b border-green-200'
-                          : change.type === 'modified'
-                          ? 'bg-yellow-50 text-yellow-800 border-b border-yellow-200'
-                          : 'bg-red-50 text-red-800 border-b border-red-200'
-                      }`}>
-                        <span className="mr-2">{change.type === 'added' ? '+' : change.type === 'modified' ? '~' : '-'}</span>
-                        <span>{change.file}</span>
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold text-gray-900">详细变更</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* 左侧：文件树 */}
+              <div className="md:col-span-1">
+                <div className="border rounded-lg p-4 bg-white h-full flex flex-col">
+                  <h5 className="text-xs font-semibold text-gray-700 mb-2">变更文件</h5>
+                  <div className="space-y-2 overflow-y-auto flex-grow max-h-96">
+                    {gitDiff.changes.map((change, idx) => (
+                      <div key={idx} className="flex items-center cursor-pointer hover:bg-gray-50 rounded px-2 py-1" onClick={() => document.getElementById(`diff-${idx}`)?.scrollIntoView({ behavior: 'smooth' })}>
+                        <span className={`mr-2 text-xs ${change.type === 'added' ? 'text-green-600' : change.type === 'modified' ? 'text-yellow-600' : 'text-red-600'}`}>
+                          {change.type === 'added' ? '+' : change.type === 'modified' ? '~' : '-'}
+                        </span>
+                        <span className="text-xs text-gray-800 truncate">{change.file}</span>
                       </div>
-                      
-                      {/* diff内容 */}
-                      {change.diff && (
-                        <div className="p-4 bg-gray-50">
-                          <pre className="text-xs font-mono overflow-x-auto">
-                            {change.diff.split('\n').map((line, lineIdx) => {
-                              let lineClass = 'text-gray-700'
-                              if (line.startsWith('+')) {
-                                lineClass = 'text-green-600 bg-green-50'
-                              } else if (line.startsWith('-')) {
-                                lineClass = 'text-red-600 bg-red-50'
-                              } else if (line.startsWith('@@')) {
-                                lineClass = 'text-blue-600 bg-blue-50'
-                              }
-                              return (
-                                <div key={lineIdx} className={lineClass}>
-                                  {line}
-                                </div>
-                              )
-                            })}
-                          </pre>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
-            )}
+              
+              {/* 右侧：详细diff */}
+              <div className="md:col-span-2">
+                <div className="border rounded-lg overflow-hidden h-full">
+                  <div className="max-h-96 overflow-auto space-y-4 p-4">
+                    {gitDiff.changes.map((change, idx) => (
+                      <div key={idx} id={`diff-${idx}`} className="border rounded-lg overflow-hidden">
+                        {/* 文件标题 */}
+                        <div className={`px-4 py-2 font-medium text-sm ${change.type === 'added' ? 'bg-green-50 text-green-800 border-b border-green-200' : change.type === 'modified' ? 'bg-yellow-50 text-yellow-800 border-b border-yellow-200' : 'bg-red-50 text-red-800 border-b border-red-200'}`}>
+                          <button className="mr-2" onClick={(e) => {
+                            e.stopPropagation();
+                            setExpandedFiles(prev => {
+                              const newExpanded = new Set(prev);
+                              if (newExpanded.has(idx)) {
+                                newExpanded.delete(idx);
+                              } else {
+                                newExpanded.add(idx);
+                              }
+                              return newExpanded;
+                            });
+                          }}>
+                            {expandedFiles.has(idx) ? '▼' : '▶'}
+                          </button>
+                          <span className="mr-2">{change.type === 'added' ? '+' : change.type === 'modified' ? '~' : '-'}</span>
+                          <span>{change.file}</span>
+                        </div>
+                        
+                        {/* diff内容 */}
+                        {change.diff && expandedFiles.has(idx) && (
+                          <div className="p-4 bg-gray-50">
+                            <pre className="text-xs font-mono overflow-x-auto">
+                              {change.diff.split('\n').map((line, lineIdx) => {
+                                let lineClass = 'text-gray-700'
+                                if (line.startsWith('+')) {
+                                  lineClass = 'text-green-600 bg-green-50'
+                                } else if (line.startsWith('-')) {
+                                  lineClass = 'text-red-600 bg-red-50'
+                                } else if (line.startsWith('@@')) {
+                                  lineClass = 'text-blue-600 bg-blue-50'
+                                }
+                                return (
+                                  <div key={lineIdx} className={lineClass}>
+                                    {line}
+                                  </div>
+                                )
+                              })}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
           </div>
         )}
       </div>
