@@ -300,3 +300,6 @@ cd frontend && npm run lint && npm run typecheck && npm run build
 - **Never** use `print()` for debugging in production Python code
 - **Never** push with `--force` to main branch
 - **Never** skip pre-commit checks with `--no-verify`
+- **Never** use \`print()\` for debugging in production Python code
+- **Never** push with \`--force\` to main branch
+- **Never** skip pre-commit checks with \`--no-verify\`
