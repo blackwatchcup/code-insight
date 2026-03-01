@@ -11,8 +11,9 @@ class GoParser(BaseParser):
 
     def __init__(self):
         try:
-            language = Language(tsgo.language())
-            self.parser = Parser(language)
+            # 使用 Language 构造函数包装语言对象
+            self.parser = Parser()
+            self.parser.set_language(tsgo.language())
         except Exception as e:
             raise ImportError(f"Failed to initialize Go parser: {e}")
 

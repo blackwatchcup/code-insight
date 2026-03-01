@@ -622,14 +622,15 @@ export default function ParserAnalysis({ projectId, project }: ParserAnalysisPro
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">语言分布</h4>
                 <div className="space-y-2">
                   {Object.entries(summary.structure.by_language).map(([lang, count]) => {
-                    const percentage = ((count / summary.structure!.total_files) * 100).toFixed(1)
+                    const totalFiles = summary.structure?.total_files ?? 1
+                    const percentage = ((count / totalFiles) * 100).toFixed(1)
                     return (
                       <div key={lang} className="flex items-center gap-3">
                         <span className="text-sm text-gray-900 w-24">{lang}</span>
                         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full"
-                            style={{ width: `${(count / summary.structure!.total_files) * 100}%` }}
+                            style={{ width: `${(count / totalFiles) * 100}%` }}
                           />
                         </div>
                         <span className="text-sm text-gray-600 w-12 text-right">{count}</span>

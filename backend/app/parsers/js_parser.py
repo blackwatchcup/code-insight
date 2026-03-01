@@ -18,7 +18,7 @@ from app.parsers.base import (
 class JavaScriptParser(BaseParser):
     def __init__(self):
         self.parser = Parser()
-        self.parser.set_language(Language(tsjs.language(), "javascript"))
+        self.parser.set_language(tsjs.language())
 
     def get_language(self) -> str:
         return "javascript"

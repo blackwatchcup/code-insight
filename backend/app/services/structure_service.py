@@ -169,23 +169,23 @@ class StructureService:
 
     async def _parse_file(self, file_path: Path) -> ParseResult:
         ext = file_path.suffix.lower()
-        parser = ParserFactory.get_parser_by_extension(ext)
-
-        if not parser:
-            return ParseResult(
-                file_path=str(file_path),
-                language="unknown",
-                error=f"No parser for extension: {ext}",
-            )
-
         try:
+            parser = ParserFactory.get_parser_by_extension(ext)
+
+            if not parser:
+                return ParseResult(
+                    file_path=str(file_path),
+                    language="unknown",
+                    error=f"No parser for extension: {ext}",
+                )
+
             content = file_path.read_text(encoding="utf-8", errors="ignore")
             result = parser.parse(content, str(file_path))
             return result
         except Exception as e:
             return ParseResult(
                 file_path=str(file_path),
-                language=parser.get_language(),
+                language="unknown",
                 error=str(e),
             )
 

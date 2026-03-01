@@ -47,14 +47,28 @@ export default function ProjectDetail() {
     if (!id) return
     setIsLoadingInfo(true)
     try {
+      // 先从数据库获取项目信息
       const response = await api.get(`/projects/${id}/info`)
-      setProjectInfo(response.data.data)
+      const projectData = response.data.data
+      
+      // 如果数据库中有架构信息，直接使用
+      if (projectData && projectData.architecture) {
+        setProjectInfo(projectData)
+        return
+      }
+      
+      // 如果数据库中没有架构信息，调用架构API生成
+      const archResponse = await api.get(`/graph/${id}/architecture`)
+      setProjectInfo({
+        description: projectData?.description || '',
+        architecture: archResponse.data.data.content
+      })
     } catch (err: any) {
       console.error('Failed to load project info:', err)
-      // 失败时使用默认描述
+      // 所有API都失败时，使用空数据
       setProjectInfo({
-        description: project?.description || '本地代码仓库智能分析和知识问答系统。CodeInsight 是一个强大的代码分析工具，能够智能分析本地代码仓库，提供代码结构可视化、依赖关系分析、功能提取等功能，并支持基于代码的智能问答。',
-        architecture: '系统采用前后端分离架构，前端使用React + TypeScript + TailwindCSS，后端使用FastAPI + Python，数据库使用SQLite。系统支持代码解析、依赖分析、功能提取、智能问答等核心功能。'
+        description: '',
+        architecture: '暂无架构信息，请点击"重新分析"按钮生成'
       })
     } finally {
       setIsLoadingInfo(false)
