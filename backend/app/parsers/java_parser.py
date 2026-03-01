@@ -11,9 +11,11 @@ class JavaParser(BaseParser):
 
     def __init__(self):
         try:
-            language = Language(tsjava.language())
-            self.parser = Parser(language)
+            # 正确初始化 Tree-sitter 语言
+            self.parser = Parser()
+            self.parser.set_language(tsjava.language())
         except Exception as e:
+            # 捕获并提供更详细的错误信息
             raise ImportError(f"Failed to initialize Java parser: {e}")
 
     def get_language(self) -> str:

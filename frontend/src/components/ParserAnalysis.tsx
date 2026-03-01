@@ -75,6 +75,18 @@ export default function ParserAnalysis({ projectId, project }: ParserAnalysisPro
     }))
   }
 
+  const toggleFile = (filePath: string) => {
+    setExpandedFiles(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(filePath)) {
+        newSet.delete(filePath)
+      } else {
+        newSet.add(filePath)
+      }
+      return newSet
+    })
+  }
+
   const renderFileStructure = (files: any[], level: number = 0) => {
     // 构建树形结构
     const tree = buildTree(files)
