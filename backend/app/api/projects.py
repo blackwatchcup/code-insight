@@ -15,6 +15,24 @@ from app.services.project_service import ProjectService
 router = APIRouter()
 
 
+class GetBranchesRequest(BaseModel):
+    url: str
+    token: Optional[str] = None
+
+
+@router.post("/branches/remote", tags=["Projects"])
+async def get_remote_branches(
+    request: GetBranchesRequest,
+):
+    """获取远程仓库的分支列表"""
+    try:
+        import_service = ImportService(None)
+        branches = await import_service.get_remote_branches(request.url, request.token)
+        return {"code": 200, "data": {"branches": branches}}
+    except Exception as e:
+        raise HTTPException(400, f"Failed to get remote branches: {str(e)}")
+
+
 class CreateProjectRequest(BaseModel):
     name: str
     source_type: str = "local"

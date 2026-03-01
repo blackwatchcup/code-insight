@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { api } from '../services/api'
 import type { ImportData } from '../types'
 
 interface ImportDialogProps {
@@ -16,6 +17,108 @@ export default function ImportDialog({ isOpen, onClose, onImport, isImporting }:
   const [url, setUrl] = useState('')
   const [branch, setBranch] = useState('main')
   const [token, setToken] = useState('')
+  const [branches, setBranches] = useState<string[]>(['main'])
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false)
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false)
+  const fetchTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      resetForm()
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    console.log('branches数组变化:', branches)
+    console.log('branches数组长度:', branches.length)
+  }, [branches])
+
+  const resetForm = () => {
+    setName('')
+    setUrl('')
+    setBranch('main')
+    setToken('')
+    setBranches(['main'])
+    setShowBranchDropdown(false)
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current)
+      fetchTimeoutRef.current = null
+    }
+  }
+
+  const extractRepoName = (url: string) => {
+    if (!url) return ''
+    const parts = url.trim().split('/')
+    const lastPart = parts[parts.length - 1]
+    return lastPart.replace('.git', '')
+  }
+
+  const fetchBranches = useCallback(async (repoUrl: string) => {
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current)
+    }
+    
+    setIsLoadingBranches(true)
+    try {
+      const response = await api.post('/projects/branches/remote', {
+        url: repoUrl,
+        token: token || undefined
+      })
+      console.log('分支API响应:', response.data)
+      console.log('响应数据结构:', JSON.stringify(response.data))
+      if (response.data.code === 200 && response.data.data.branches) {
+        const fetchedBranches = response.data.data.branches
+        console.log('获取到的分支:', fetchedBranches)
+        console.log('分支类型:', typeof fetchedBranches)
+        console.log('分支数组长度:', fetchedBranches.length)
+        console.log('分支内容:', JSON.stringify(fetchedBranches))
+        setBranches(fetchedBranches)
+        console.log('设置branches后，当前branches状态应该更新')
+        if (fetchedBranches.includes('main')) {
+          setBranch('main')
+        } else if (fetchedBranches.length > 0) {
+          setBranch(fetchedBranches[0])
+        }
+      } else {
+        console.log('API响应格式不正确:', response.data)
+      }
+    } catch (error) {
+      console.error('获取分支失败:', error)
+      setBranches(['main', 'master'])
+    } finally {
+      setIsLoadingBranches(false)
+    }
+  }, [token])
+
+  const handleUrlChange = (newUrl: string) => {
+    setUrl(newUrl)
+    
+    const repoName = extractRepoName(newUrl)
+    if (repoName && !name) {
+      setName(repoName)
+    }
+
+    if (newUrl && (type === 'github' || type === 'gitlab' || type === 'gitee')) {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current)
+      }
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchBranches(newUrl)
+      }, 500)
+    }
+  }
+
+  const handleTokenChange = (newToken: string) => {
+    setToken(newToken)
+    if (url && (type === 'github' || type === 'gitlab' || type === 'gitee')) {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current)
+      }
+      fetchTimeoutRef.current = setTimeout(() => {
+        fetchBranches(url)
+      }, 500)
+    }
+  }
 
   if (!isOpen) return null
 
@@ -154,7 +257,7 @@ export default function ImportDialog({ isOpen, onClose, onImport, isImporting }:
               <input
                 type="text"
                 value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                onChange={(e) => handleUrlChange(e.target.value)}
                 placeholder={
                   type === 'zip'
                     ? 'https://example.com/project.zip'
@@ -181,15 +284,53 @@ export default function ImportDialog({ isOpen, onClose, onImport, isImporting }:
           {/* Branch & Token */}
           {type !== 'zip' && type !== 'local' && (
             <div className="grid grid-cols-2 gap-4">
-              <div>
+              <div className="relative">
                 <label className="block text-sm font-medium text-gray-700 mb-2">分支</label>
-                <input
-                  type="text"
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  placeholder="main"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                />
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowBranchDropdown(!showBranchDropdown)}
+                    disabled={isLoadingBranches}
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="truncate">{branch}</span>
+                    <svg className={`w-4 h-4 ml-2 transition-transform ${showBranchDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showBranchDropdown && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      {isLoadingBranches ? (
+                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                          加载分支中...
+                        </div>
+                      ) : branches.length === 0 ? (
+                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                          暂无分支
+                        </div>
+                      ) : (
+                        <>
+                          {console.log('渲染下拉框，branches:', branches)}
+                          {branches.map((b) => (
+                            <button
+                              key={b}
+                              type="button"
+                              onClick={() => {
+                                setBranch(b)
+                                setShowBranchDropdown(false)
+                              }}
+                              className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-50 transition-colors ${
+                                branch === b ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                              }`}
+                            >
+                              {b}
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               
               {type === 'github' && (
@@ -200,7 +341,7 @@ export default function ImportDialog({ isOpen, onClose, onImport, isImporting }:
                   <input
                     type="password"
                     value={token}
-                    onChange={(e) => setToken(e.target.value)}
+                    onChange={(e) => handleTokenChange(e.target.value)}
                     placeholder="ghp_xxxx"
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all font-mono text-sm"
                   />

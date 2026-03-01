@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import tempfile
 import uuid
@@ -20,6 +21,62 @@ logger = logging.getLogger(__name__)
 class ImportService:
     def __init__(self, db: Session):
         self.db = db
+
+    async def get_remote_branches(
+        self, url: str, token: Optional[str] = None
+    ) -> list[str]:
+        """获取远程仓库的分支列表"""
+        try:
+            if "github.com" in url:
+                match = re.search(r"github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$", url)
+                if match:
+                    owner, repo = match.groups()
+                    api_url = f"https://api.github.com/repos/{owner}/{repo}/branches"
+                    headers = {}
+                    if token:
+                        headers["Authorization"] = f"token {token}"
+                    
+                    logger.info(f"使用GitHub API获取分支: {api_url}")
+                    import httpx
+                    async with httpx.AsyncClient() as client:
+                        response = await client.get(api_url, headers=headers)
+                        if response.status_code == 200:
+                            branches_data = response.json()
+                            branches = [b["name"] for b in branches_data]
+                            unique_branches = sorted(set(branches))
+                            logger.info(f"成功获取到 {len(unique_branches)} 个分支: {unique_branches}")
+                            return unique_branches
+                        else:
+                            logger.warning(f"GitHub API返回状态码: {response.status_code}")
+                            raise Exception(f"GitHub API error: {response.status_code}")
+            
+            logger.info("尝试使用git clone获取分支")
+            if token and "github.com" in url:
+                url = url.replace("github.com", f"{token}@github.com")
+
+            temp_dir = Path(tempfile.gettempdir()) / f"temp_git_branches_{uuid.uuid4().hex[:8]}"
+            try:
+                logger.info(f"开始获取远程分支: {url}")
+                
+                repo = git.Repo.clone_from(
+                    url,
+                    temp_dir,
+                    depth=1,
+                    no_single_branch=True
+                )
+                
+                branches = [ref.name.split('/')[-1] for ref in repo.references if ref.name.startswith('refs/remotes/origin/')]
+                unique_branches = sorted(set(branches))
+                logger.info(f"成功获取到 {len(unique_branches)} 个分支: {unique_branches}")
+                return unique_branches
+            finally:
+                if temp_dir.exists():
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception as e:
+            logger.error(f"获取远程分支失败: {e}")
+            logger.error(f"错误类型: {type(e).__name__}")
+            logger.info("返回默认分支列表: ['main', 'master']")
+            return ['main', 'master']
 
     async def import_from_git(
         self,
