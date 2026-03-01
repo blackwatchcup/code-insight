@@ -31,6 +31,163 @@ call_graph_builder = CallGraphBuilder()
 dependency_analyzer = DependencyAnalyzer()
 
 
+def _build_dependency_tree(dep_graph: Any, max_items_per_group: int = 80) -> Dict[str, Any]:
+    internal_modules = dep_graph.internal_modules
+    external_modules = dep_graph.external_modules
+    module_imports = dep_graph.module_imports or {}
+    module_imported_by = dep_graph.module_imported_by or {}
+
+    internal_names = sorted(internal_modules.keys())
+    external_names = sorted(external_modules.keys())
+
+    internal_children: List[Dict[str, Any]] = []
+    for module in internal_names[:max_items_per_group]:
+        imports = sorted(set(module_imports.get(module, [])))
+        internal_imports = [name for name in imports if name in internal_modules]
+        external_imports = [name for name in imports if name in external_modules]
+
+        children: List[Dict[str, Any]] = []
+
+        if internal_imports:
+            children.append(
+                {
+                    "id": f"group:internal-imports:{module}",
+                    "name": "内部依赖",
+                    "type": "group",
+                    "children": [
+                        {
+                            "id": f"internal-ref:{module}:{target}",
+                            "name": target,
+                            "type": "internal_dependency",
+                            "children": [],
+                        }
+                        for target in internal_imports
+                    ],
+                }
+            )
+
+        if external_imports:
+            children.append(
+                {
+                    "id": f"group:external-imports:{module}",
+                    "name": "外部依赖",
+                    "type": "group",
+                    "children": [
+                        {
+                            "id": f"external-ref:{module}:{target}",
+                            "name": target,
+                            "type": "external_dependency",
+                            "children": [],
+                        }
+                        for target in external_imports
+                    ],
+                }
+            )
+
+        internal_children.append(
+            {
+                "id": f"internal:{module}",
+                "name": module,
+                "type": "internal_module",
+                "meta": {
+                    "imports_count": len(imports),
+                    "internal_imports": len(internal_imports),
+                    "external_imports": len(external_imports),
+                },
+                "children": children,
+            }
+        )
+
+    if len(internal_names) > max_items_per_group:
+        internal_children.append(
+            {
+                "id": "internal:truncated",
+                "name": f"还有 {len(internal_names) - max_items_per_group} 个内部模块未展示",
+                "type": "truncated",
+                "children": [],
+            }
+        )
+
+    external_children: List[Dict[str, Any]] = []
+    for module in external_names[:max_items_per_group]:
+        imported_by = sorted(set(module_imported_by.get(module, [])))
+
+        external_children.append(
+            {
+                "id": f"external:{module}",
+                "name": module,
+                "type": "external_module",
+                "meta": {"imported_by_count": len(imported_by)},
+                "children": [
+                    {
+                        "id": f"used-by:{module}",
+                        "name": "被内部模块引用",
+                        "type": "group",
+                        "children": [
+                            {
+                                "id": f"used-by:{module}:{source}",
+                                "name": source,
+                                "type": "used_by_module",
+                                "children": [],
+                            }
+                            for source in imported_by[:30]
+                        ]
+                        + (
+                            [
+                                {
+                                    "id": f"used-by:{module}:truncated",
+                                    "name": f"还有 {len(imported_by) - 30} 个模块未展示",
+                                    "type": "truncated",
+                                    "children": [],
+                                }
+                            ]
+                            if len(imported_by) > 30
+                            else []
+                        ),
+                    }
+                ]
+                if imported_by
+                else [],
+            }
+        )
+
+    if len(external_names) > max_items_per_group:
+        external_children.append(
+            {
+                "id": "external:truncated",
+                "name": f"还有 {len(external_names) - max_items_per_group} 个外部依赖未展示",
+                "type": "truncated",
+                "children": [],
+            }
+        )
+
+    return {
+        "id": "dependency-root",
+        "name": "依赖关系",
+        "type": "root",
+        "meta": {
+            "internal_modules": len(internal_names),
+            "external_modules": len(external_names),
+        },
+        "children": [
+            {
+                "id": "group:internal",
+                "name": "内部模块",
+                "type": "group",
+                "meta": {"count": len(internal_names)},
+                "children": internal_children,
+            },
+            {
+                "id": "group:external",
+                "name": "外部依赖",
+                "type": "group",
+                "meta": {"count": len(external_names)},
+                "children": external_children,
+            },
+        ],
+    }
+
+
 @router.get("/languages", tags=["Parser"])
 async def get_supported_languages():
     return {
@@ -141,6 +298,7 @@ async def get_dependencies(project_id: str):
             "code": 200,
             "data": {
                 "graph": dep_graph.to_dict(),
+                "dependency_tree": _build_dependency_tree(dep_graph),
                 "circular_dependencies": circular,
                 "most_depended_on": most_depended,
                 "most_dependent": most_dependent,

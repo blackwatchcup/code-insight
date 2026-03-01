@@ -149,17 +149,54 @@ export interface CallGraph {
   leaf_functions: string[]
 }
 
-export interface DependencyGraph {
-  internal_modules: string[]
-  external_modules: string[]
-  internal_edges: Array<{ source: string; target: string }>
-  external_edges: Array<{ source: string; target: string }>
-  graph?: {
-    to_dict(): any
-    circular_dependencies?: any[]
-    most_depended_on?: any[]
-    most_dependent?: any[]
+export interface DependencyModuleNode {
+  name: string
+  file_path: string
+  is_external: boolean
+}
+
+export interface DependencyEdge {
+  source: string
+  target: string
+  imports: string[]
+  is_external: boolean
+}
+
+export interface DependencyTreeNode {
+  id: string
+  name: string
+  type:
+    | 'root'
+    | 'group'
+    | 'internal_module'
+    | 'external_module'
+    | 'internal_dependency'
+    | 'external_dependency'
+    | 'used_by_module'
+    | 'truncated'
+  children: DependencyTreeNode[]
+  meta?: Record<string, number>
+}
+
+export interface DependencyGraphData {
+  internal_modules: Record<string, DependencyModuleNode>
+  external_modules: Record<string, DependencyModuleNode>
+  internal_edges: DependencyEdge[]
+  external_edges: DependencyEdge[]
+  stats: {
+    internal_modules: number
+    external_modules: number
+    internal_edges: number
+    external_edges: number
   }
+}
+
+export interface DependencyGraph {
+  graph: DependencyGraphData
+  dependency_tree?: DependencyTreeNode
+  circular_dependencies: string[][]
+  most_depended_on: Array<{ module: string; count: number }>
+  most_dependent: Array<{ module: string; count: number }>
 }
 
 // 智能聊天相关类型
