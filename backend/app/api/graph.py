@@ -59,22 +59,89 @@ async def get_flowchart(
 
 @router.get("/{project_id}/architecture")
 async def get_architecture(project_id: str, db: Session = Depends(get_db)):
-    """Generate architecture diagram from feature tree."""
+    """Get architecture diagram from LLM-generated analysis."""
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # 获取功能树
-    structure_service = StructureService()
-    feature_tree = structure_service.get_feature_tree(project_id, db)
+    # 使用LLM生成的架构描述
+    architecture = getattr(project, 'architecture', None)
+    if architecture:
+        # 返回LLM生成的架构描述
+        return {
+            "data": {
+                "type": "architecture",
+                "format": "markdown",
+                "content": architecture,
+                "source": "llm"
+            }
+        }
 
-    if not feature_tree:
-        raise HTTPException(status_code=404, detail="Feature tree not found")
+    # 如果没有架构信息，返回提示
+    return {
+        "data": {
+            "type": "architecture",
+            "format": "text",
+            "content": "暂无架构信息。请点击\"重新分析\"按钮触发项目分析，或等待项目导入分析完成。",
+            "source": "none"
+        }
+    }
 
-    generator = ArchGenerator()
-    result = await generator.generate(feature_tree)
+
+@router.get("/{project_id}/analysis")
+async def get_project_analysis(project_id: str, db: Session = Depends(get_db)):
+    """Get complete project analysis including architecture, data flow, APIs, etc."""
+    import json
+    
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    result = {
+        "project_id": project_id,
+        "project_name": project.name,
+        "project_summary": project.project_summary,
+        "architecture": getattr(project, 'architecture', None),
+        "data_flow": getattr(project, 'data_flow', None),
+        "tech_stack": json.loads(project.tech_stack) if project.tech_stack else [],
+        "features_detail": None,
+        "api_info": None,
+        "key_modules": None,
+    }
+
+    # 解析JSON字段
+    try:
+        features_detail = getattr(project, 'features_detail', None)
+        if features_detail:
+            result["features_detail"] = json.loads(features_detail)
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    try:
+        api_info = getattr(project, 'api_info', None)
+        if api_info:
+            result["api_info"] = json.loads(api_info)
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    try:
+        key_modules = getattr(project, 'key_modules', None)
+        if key_modules:
+            result["key_modules"] = json.loads(key_modules)
+    except (json.JSONDecodeError, TypeError):
+        pass
 
     return {"data": result}
+
+    # 如果都没有，返回提示信息
+    return {
+        "data": {
+            "type": "architecture",
+            "format": "text",
+            "content": "暂无架构信息。请先导入项目并等待分析完成，或手动触发项目分析。",
+            "source": "none"
+        }
+    }
 
 
 @router.get("/{project_id}/callgraph")

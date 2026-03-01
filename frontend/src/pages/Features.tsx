@@ -26,11 +26,18 @@ interface FeatureTreeData {
   backend: FeatureNode
 }
 
+interface ArchitectureData {
+  type: string
+  format: 'mermaid' | 'markdown' | 'text'
+  content: string
+  source: string
+}
+
 export function Features({ projectId }: Props) {
   const [featureTree, setFeatureTree] = useState<FeatureTreeData | null>(null)
   const [selectedFeature, setSelectedFeature] = useState<FeatureNode | null>(null)
   const [activeTab, setActiveTab] = useState<'frontend' | 'backend'>('frontend')
-  const [architectureData, setArchitectureData] = useState('')
+  const [architectureData, setArchitectureData] = useState<ArchitectureData | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -53,12 +60,46 @@ export function Features({ projectId }: Props) {
     try {
       setLoading(true)
       const res = await api.get(`/graph/${projectId}/architecture`)
-      setArchitectureData(res.data.data.content)
+      setArchitectureData(res.data.data)
     } catch (err) {
       console.error('Failed to generate architecture:', err)
     } finally {
       setLoading(false)
     }
+  }
+
+  const renderArchitecture = () => {
+    if (!architectureData) return null
+
+    if (architectureData.format === 'mermaid') {
+      return (
+        <div className="border border-gray-200 rounded-lg p-4 bg-white">
+          <h3 className="text-lg font-semibold mb-3">架构图</h3>
+          <p className="text-sm text-gray-500 mb-2">
+            {architectureData.source === 'llm' ? '由AI生成的架构图' : '基于功能树生成的架构图'}
+          </p>
+          <MermaidChart code={architectureData.content} className="w-full" />
+        </div>
+      )
+    }
+
+    if (architectureData.format === 'markdown' || architectureData.format === 'text') {
+      return (
+        <div className="border border-gray-200 rounded-lg p-4 bg-white overflow-auto" style={{ maxHeight: '600px' }}>
+          <h3 className="text-lg font-semibold mb-3">架构描述</h3>
+          <p className="text-sm text-gray-500 mb-2">
+            {architectureData.source === 'llm' ? '由AI生成的架构分析' : '架构信息'}
+          </p>
+          <div className="prose prose-sm max-w-none">
+            <pre className="whitespace-pre-wrap text-sm bg-gray-50 p-4 rounded-lg">
+              {architectureData.content}
+            </pre>
+          </div>
+        </div>
+      )
+    }
+
+    return null
   }
 
   const renderFeatureDetail = (feature: FeatureNode) => {
@@ -152,13 +193,10 @@ export function Features({ projectId }: Props) {
               {renderFeatureDetail(selectedFeature)}
             </div>
           ) : architectureData ? (
-            <div className="border border-gray-200 rounded-lg p-4 bg-white">
-              <h3 className="text-lg font-semibold mb-3">架构图</h3>
-              <MermaidChart code={architectureData} className="w-full" />
-            </div>
+            renderArchitecture()
           ) : (
             <div className="flex items-center justify-center h-full text-gray-500">
-              选择一个功能查看详情
+              选择一个功能查看详情，或点击"生成架构图"按钮查看项目架构
             </div>
           )}
         </div>

@@ -45,27 +45,38 @@ export const useProjectStore = create<ProjectStore>((set) => ({
   importProject: async (data: ImportData) => {
     set({ isImporting: true, error: null })
     try {
+      let projectData
       if (data.source_type === 'local') {
-        await api.post('/projects', {
+        const res = await api.post('/projects', {
           name: data.name,
           source_type: 'local',
           local_path: data.url,
         })
+        projectData = res.data.data || res.data
+        console.log('本地项目创建成功:', projectData)
       } else {
-        await api.post('/projects/import', {
+        const res = await api.post('/projects/import', {
           type: data.source_type,
           url: data.url,
           name: data.name,
           branch: data.branch,
           token: data.token,
         })
+        projectData = res.data.data || res.data
+        console.log('导入项目成功:', projectData)
       }
+      
       set({ isImporting: false })
+      
       // Refresh project list after import
       const res = await api.get('/projects')
+      console.log('刷新项目列表响应:', res.data)
       const items = res.data.items || res.data.data?.items || []
+      console.log('项目列表:', items)
       set({ projects: items })
     } catch (err: any) {
+      console.error('导入项目失败:', err)
+      console.error('错误详情:', err.response?.data)
       set({ error: err.message, isImporting: false })
       throw err
     }

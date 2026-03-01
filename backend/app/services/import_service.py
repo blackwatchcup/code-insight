@@ -3,6 +3,7 @@ import shutil
 import tempfile
 import uuid
 import zipfile
+import logging
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -12,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.project import Project, ProjectStatus, SourceType
+
+logger = logging.getLogger(__name__)
 
 
 class ImportService:
@@ -58,6 +61,7 @@ class ImportService:
         # Git导入的项目肯定是Git仓库
         is_git_repo = True
         
+        # 创建项目时不设置architecture字段，避免数据库错误
         project = Project(
             id=project_id,
             name=name,
@@ -77,6 +81,11 @@ class ImportService:
         self.db.add(project)
         self.db.commit()
         self.db.refresh(project)
+
+        # 不再在导入时自动执行完整分析，改为用户手动触发
+        # 这样可以大幅提升导入速度
+        # 用户可以通过点击"分析项目"按钮来触发完整分析
+        logger.info(f"项目 {project.name} 导入完成，未执行自动分析")
 
         return project
 
@@ -116,6 +125,7 @@ class ImportService:
             # 检查是否为Git仓库
             is_git_repo = (project_dir / ".git").exists()
 
+            # 创建项目时不设置architecture字段，避免数据库错误
             project = Project(
                 id=project_id,
                 name=name,
@@ -134,6 +144,11 @@ class ImportService:
             self.db.add(project)
             self.db.commit()
             self.db.refresh(project)
+
+            # 不再在导入时自动执行完整分析，改为用户手动触发
+            # 这样可以大幅提升导入速度
+            # 用户可以通过点击"分析项目"按钮来触发完整分析
+            logger.info(f"项目 {project.name} 导入完成，未执行自动分析")
 
             return project
         finally:

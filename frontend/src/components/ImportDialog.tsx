@@ -22,16 +22,20 @@ export default function ImportDialog({ isOpen, onClose, onImport, isImporting }:
   const handleImport = async () => {
     if (!name || (type !== 'local' && !url)) return
     
-    await onImport({
-      name,
-      url,
-      source_type: type,
-      branch: type === 'local' ? undefined : branch,
-      token: type === 'github' ? token : undefined,
-    })
-    
-    if (!isImporting) {
+    try {
+      await onImport({
+        name,
+        url,
+        source_type: type,
+        branch: type === 'local' ? undefined : branch,
+        token: type === 'github' ? token : undefined,
+      })
+      
+      // 导入成功后关闭弹窗
       onClose()
+    } catch (error) {
+      console.error('导入失败:', error)
+      // 导入失败时不关闭弹窗，让用户看到错误
     }
   }
 

@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models.project import Project, ProjectStatus, SourceType
+from app.services.project_context_service import ProjectContextService
+from app.llm.service import LLMService
 
 
 class ProjectService:
@@ -36,6 +38,7 @@ class ProjectService:
         # 检查是否为Git仓库
         is_git_repo = (Path(local_path) / ".git").exists()
         
+        # 创建项目时不设置architecture字段，避免数据库错误
         project = Project(
             id=project_id,
             name=name,
@@ -52,6 +55,22 @@ class ProjectService:
         self.db.add(project)
         self.db.commit()
         self.db.refresh(project)
+
+        # 不再自动生成项目上下文信息，改为用户手动触发
+        # 这样可以大幅提升项目创建速度
+        # 用户可以通过点击"分析项目"按钮来触发完整分析
+        try:
+            # 只读取README文件，不执行LLM分析
+            readme_path = project_dir / "README.md"
+            if readme_path.exists():
+                try:
+                    with open(readme_path, "r", encoding="utf-8", errors="ignore") as f:
+                        project.readme_content = f.read()
+                        self.db.commit()
+                except Exception:
+                    pass
+        except Exception as e:
+            print(f"读取README文件失败: {e}")
 
         return project
 
@@ -144,103 +163,34 @@ class ProjectService:
         if not project:
             raise ValueError("Project not found")
 
-        # 尝试读取README.md文件
-        readme_path = Path(project.local_path) / "README.md"
-        description = ""
-        if readme_path.exists():
-            try:
-                with open(readme_path, "r", encoding="utf-8", errors="ignore") as f:
-                    description = f.read()
-            except Exception:
-                pass
-
-        # 如果README.md为空，使用默认描述
+        # 优先使用生成的项目摘要
+        description = project.project_summary or ""
+        
+        # 如果没有生成的摘要，尝试读取README.md文件
         if not description:
-            description = "本地代码仓库智能分析和知识问答系统。CodeInsight 是一个强大的代码分析工具，能够智能分析本地代码仓库，提供代码结构可视化、依赖关系分析、功能提取等功能，并支持基于代码的智能问答。"
+            readme_path = Path(project.local_path) / "README.md"
+            if readme_path.exists():
+                try:
+                    with open(readme_path, "r", encoding="utf-8", errors="ignore") as f:
+                        description = f.read()
+                except Exception:
+                    pass
+            
+            # 如果README.md为空，返回空字符串
+            # 不再使用默认描述
+            if not description:
+                description = ""
 
-        # 生成实际架构的markdown描述
-        architecture = """# 系统架构
-
-```
-┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
-│                     │     │                     │     │                     │
-│   前端应用          │────▶│   后端API           │────▶│   数据库            │
-│   React + TypeScript│     │   FastAPI + Python  │     │   SQLite            │
-│   TailwindCSS       │◀────│                     │◀────│                     │
-│                     │     │                     │     │                     │
-└─────────────────────┘     └─────────────────────┘     └─────────────────────┘
-          ▲                          ▲                          ▲
-          │                          │                          │
-          ▼                          ▼                          ▼
-┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
-│                     │     │                     │     │                     │
-│   代码解析模块       │     │   功能分析模块       │     │   向量存储          │
-│   Python/JS/TS/Go   │     │   API提取/特征检测  │     │   嵌入式向量        │
-│   Java解析器        │     │                     │     │                     │
-│                     │     │                     │     │                     │
-└─────────────────────┘     └─────────────────────┘     └─────────────────────┘
-          ▲                          ▲                          ▲
-          │                          │                          │
-          └──────────────────────────┼──────────────────────────┘
-                                     │
-                                     ▼
-                            ┌─────────────────────┐
-                            │                     │
-                            │   智能问答模块      │
-                            │   LLM集成          │
-                            │   RAG技术          │
-                            │                     │
-                            └─────────────────────┘
-```
-
-## 架构说明
-
-1. **前端应用**：
-   - 使用React + TypeScript构建用户界面
-   - TailwindCSS用于样式设计
-   - 提供项目管理、代码分析、智能问答等功能
-
-2. **后端API**：
-   - FastAPI框架提供RESTful API
-   - Python实现核心业务逻辑
-   - 处理前端请求，返回分析结果
-
-3. **数据库**：
-   - SQLite存储项目信息、聊天记录等数据
-   - 轻量级设计，易于部署
-
-4. **代码解析模块**：
-   - 支持多种编程语言的解析器
-   - 提取代码结构、函数、类等信息
-   - 生成代码依赖关系图
-
-5. **功能分析模块**：
-   - API提取与分析
-   - 特征检测与提取
-   - 代码质量评估
-
-6. **向量存储**：
-   - 存储代码嵌入向量
-   - 支持相似性搜索
-   - 为RAG技术提供基础
-
-7. **智能问答模块**：
-   - 集成LLM模型
-   - 基于RAG技术提供代码相关问答
-   - 支持上下文理解和多轮对话
-
-## 数据流
-
-1. 用户通过前端上传或导入项目
-2. 后端接收项目并进行解析
-3. 解析模块分析代码结构和依赖关系
-4. 功能分析模块提取项目特征和API
-5. 向量存储模块将代码转换为向量并存储
-6. 用户通过前端发起智能问答请求
-7. 后端使用RAG技术检索相关代码片段
-8. LLM基于检索结果生成回答
-9. 前端展示回答给用户
-"""
+        # 优先使用生成的架构描述，处理字段不存在的情况
+        architecture = ""
+        try:
+            architecture = project.architecture or ""
+        except AttributeError:
+            # 数据库表中可能还没有architecture字段
+            pass
+        
+        # 如果没有生成的架构描述，返回空字符串
+        # 不再使用默认架构信息
 
         return {
             "description": description,
@@ -276,9 +226,11 @@ class ProjectService:
             raise ValueError(f"Project directory does not exist: {project_dir}")
 
         try:
-            print(f"Updating project {project_id} with source_type: {project.source_type}")
-            print(f"Project local path: {project.local_path}")
-            print(f"Project source URL: {project.source_url}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Updating project {project_id} with source_type: {project.source_type}")
+            logger.info(f"Project local path: {project.local_path}")
+            logger.info(f"Project source URL: {project.source_url}")
 
             update_success = False
             update_message = ""
@@ -301,16 +253,16 @@ class ProjectService:
                     text=True,
                     encoding="utf-8"
                 )
-                print(f"Git pull output: {pull_result.stdout}")
+                logger.info(f"Git pull output: {pull_result.stdout}")
                 if pull_result.stderr:
-                    print(f"Git pull stderr: {pull_result.stderr}")
-                print(f"Git pull return code: {pull_result.returncode}")
+                    logger.warning(f"Git pull stderr: {pull_result.stderr}")
+                logger.info(f"Git pull return code: {pull_result.returncode}")
 
                 # If pull failed, don't raise exception, just log it and continue
                 # This is to avoid 500 errors when git pull fails due to local changes or network issues
                 if pull_result.returncode != 0:
                     error_msg = pull_result.stderr.strip() or pull_result.stdout.strip() or "Unknown git error"
-                    print(f"Git pull failed but continuing with project update: {error_msg}")
+                    logger.warning(f"Git pull failed but continuing with project update: {error_msg}")
                     update_success = True
                     update_message = "Git pull failed but continuing with project update"
                 else:
@@ -346,11 +298,11 @@ class ProjectService:
                                 func(path)
                             shutil.rmtree(item, onerror=on_rm_error)
                 except Exception as e:
-                    print(f"Warning: Failed to clear some items from project directory: {e}")
+                    logger.warning(f"Failed to clear some items from project directory: {e}")
 
                 # Copy from source path
                 shutil.copytree(source_path, project_dir, dirs_exist_ok=True)
-                print("Copy completed successfully")
+                logger.info("Copy completed successfully")
                 update_success = True
                 update_message = "Files copied successfully from source"
 
@@ -372,14 +324,52 @@ class ProjectService:
             from sqlalchemy.sql import func
             project.updated_at = func.now()
 
-            self.db.commit()
-            self.db.refresh(project)
+            # 重新生成项目上下文信息（全面分析）
+            try:
+                llm_service = LLMService()
+                context_service = ProjectContextService(self.db, llm_service)
+                
+                # 重新读取README文件
+                readme_path = project_dir / "README.md"
+                if readme_path.exists():
+                    try:
+                        with open(readme_path, "r", encoding="utf-8", errors="ignore") as f:
+                            project.readme_content = f.read()
+                    except Exception:
+                        pass
+                else:
+                    project.readme_content = None
+                
+                # 清除旧的摘要和分析数据
+                project.project_summary = None
+                project.tech_stack = None
+                try:
+                    project.architecture = None
+                    project.data_flow = None
+                    project.features_detail = None
+                    project.api_info = None
+                    project.key_modules = None
+                except AttributeError:
+                    # 某些字段可能不存在
+                    pass
+                
+                # 使用新的全面分析方法，生成：项目摘要、架构、数据流程、功能点、API信息等
+                await context_service.generate_project_analysis(project.id)
+                
+                self.db.commit()
+                self.db.refresh(project)
+                logger.info(f"项目分析完成: {project.name}")
+            except Exception as e:
+                logger.error(f"重新生成项目分析失败: {e}")
+                # 即使生成失败，也要提交其他更新
+                self.db.commit()
+                self.db.refresh(project)
 
-            print(f"Project updated successfully: {project.name} ({update_message})")
+            logger.info(f"Project updated successfully: {project.name} ({update_message})")
             return project
 
         except Exception as e:
-            print(f"Error updating project: {str(e)}")
+            logger.error(f"Error updating project: {str(e)}")
             import traceback
             traceback.print_exc()
             raise ValueError(f"Failed to update project: {str(e)}")

@@ -195,6 +195,26 @@ async def index_project(
                 .values(status=ProjectStatus.READY)
             )
             db.commit()
+            
+            # 生成项目上下文信息
+            try:
+                from app.llm.service import LLMService
+                from app.services.project_context_service import ProjectContextService
+                
+                llm_service = LLMService()
+                context_service = ProjectContextService(db, llm_service)
+                
+                # 清除旧的摘要和技术栈，重新生成
+                project.project_summary = None
+                project.tech_stack = None
+                db.commit()
+                
+                # 生成项目摘要和分析技术栈
+                await context_service.generate_project_summary(request.project_id)
+                
+                print(f"项目上下文信息生成成功: {request.project_id}")
+            except Exception as e:
+                print(f"生成项目上下文信息失败: {e}")
 
     return IndexResponse(code=200, data=result)
 

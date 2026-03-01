@@ -4,6 +4,8 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import openai
 
+from app.core.config import settings
+
 
 @dataclass
 class LLMConfig:
@@ -18,8 +20,25 @@ class LLMConfig:
 class LLMService:
     def __init__(self, config: Optional[LLMConfig] = None):
         self.config = config or LLMConfig()
-        self.api_key = config.api_key if config else os.getenv("OPENAI_API_KEY")
-        self.base_url = config.base_url if config else os.getenv("OPENAI_BASE_URL")
+        # 优先使用config中的api_key和base_url
+        # 然后使用settings中的配置
+        # 最后尝试从环境变量中读取
+        # 支持DEEPSEEK_API_KEY和OPENAI_API_KEY环境变量
+        self.api_key = (
+            self.config.api_key or 
+            settings.OPENAI_API_KEY or
+            os.getenv("DEEPSEEK_API_KEY") or 
+            os.getenv("OPENAI_API_KEY")
+        )
+        self.base_url = (
+            self.config.base_url or 
+            settings.OPENAI_BASE_URL or
+            os.getenv("DEEPSEEK_BASE_URL") or 
+            os.getenv("OPENAI_BASE_URL")
+        )
+        # 确保模型设置正确
+        if not self.config.model:
+            self.config.model = settings.OPENAI_MODEL
 
         client_kwargs = {"api_key": self.api_key}
         if self.base_url:

@@ -218,6 +218,67 @@ async def update_project(
         raise HTTPException(500, f"Failed to update project: {str(e)}")
 
 
+@router.post("/{project_id}/analyze", tags=["Projects"])
+async def analyze_project(
+    project_id: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    """触发项目重新分析
+    
+    生成或更新项目的全面分析信息，包括：
+    - 项目摘要
+    - 技术栈分析
+    - 架构描述
+    - 数据流程
+    - 功能点分析
+    - API信息
+    - 关键模块
+    """
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+
+    # Check access permission
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(403, "Access denied")
+
+    try:
+        from app.llm.service import LLMService
+        from app.services.project_context_service import ProjectContextService
+        
+        llm_service = LLMService()
+        context_service = ProjectContextService(db, llm_service)
+        
+        # 执行全面分析
+        results = await context_service.generate_project_analysis(project_id)
+        
+        # 刷新项目数据
+        db.refresh(project)
+        
+        return {
+            "code": 200, 
+            "data": {
+                "message": "项目分析完成",
+                "project": project.to_dict(),
+                "analysis_results": {
+                    "tech_stack_count": len(results.get("tech_stack", [])),
+                    "has_architecture": bool(results.get("architecture")),
+                    "has_summary": bool(results.get("project_summary")),
+                    "has_data_flow": bool(results.get("data_flow")),
+                    "api_count": len(results.get("api_info", {}).get("apis", [])),
+                    "modules_count": len(results.get("key_modules", {}).get("modules", [])),
+                }
+            }
+        }
+    except Exception as e:
+        import logging
+        logging.error(f"分析项目失败: {e}")
+        raise HTTPException(500, f"Failed to analyze project: {str(e)}")
+
+
 @router.post("/{project_id}/git/initialize", tags=["Projects"])
 async def initialize_git_repo(
     project_id: str,
