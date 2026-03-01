@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useFeatureStore } from '../stores/featureStore'
-import type { FeatureNode, APIEndpoint, DataModel } from '../types'
+import type { FeatureNode, APIEndpoint, DataModel, FeatureInsightsData } from '../types'
 
 interface FeatureAnalysisProps {
   projectId: string
@@ -14,8 +14,19 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
   const [backendFeatures, setBackendFeatures] = useState<FeatureNode[]>([])
   const [apiEndpoints, setApiEndpoints] = useState<APIEndpoint[]>([])
   const [dataModels, setDataModels] = useState<DataModel[]>([])
+  const [insights, setInsights] = useState<FeatureInsightsData | null>(null)
+  const [isLoadingLLMInsights, setIsLoadingLLMInsights] = useState(false)
   
-  const { getFeatureTree, getFrontendFeatures, getBackendFeatures, getApiEndpoints, getDataModels, isLoading, error } = useFeatureStore()
+  const {
+    getFeatureTree,
+    getFrontendFeatures,
+    getBackendFeatures,
+    getApiEndpoints,
+    getDataModels,
+    getFeatureInsights,
+    isLoading,
+    error,
+  } = useFeatureStore()
 
   const formatFilePath = (filePath: string) => {
     // 移除路径前缀，只显示相对路径，并使用项目名称作为根目录
@@ -69,6 +80,9 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
         getDataModels(projectId).catch(() => []),
       ])
 
+      const insightData = await getFeatureInsights(projectId, false).catch(() => null)
+      setInsights(insightData)
+
       // 处理前端功能数据
       if (frontendData && typeof frontendData === 'object' && !Array.isArray(frontendData)) {
         const frontendFeaturesList: any[] = []
@@ -110,6 +124,22 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
     } catch (err) {
       console.error('Failed to load features:', err)
     }
+  }
+
+  const loadLLMInsights = async () => {
+    setIsLoadingLLMInsights(true)
+    try {
+      const data = await getFeatureInsights(projectId, true)
+      setInsights(data)
+    } catch (e) {
+      console.error('Failed to load LLM insights:', e)
+    } finally {
+      setIsLoadingLLMInsights(false)
+    }
+  }
+
+  const getMetric = (section: 'frontend' | 'backend', key: string) => {
+    return insights?.[section]?.metrics?.[key] ?? 0
   }
 
   const renderFeatureTree = (node: FeatureNode, level: number = 0) => {
@@ -160,6 +190,82 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
 
   return (
     <div className="space-y-6">
+      {insights && (
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-gray-200/50 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">功能分析总结</h3>
+            <button
+              type="button"
+              onClick={loadLLMInsights}
+              disabled={isLoadingLLMInsights}
+              className="px-3 py-1.5 text-sm rounded-lg border border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-60"
+            >
+              {isLoadingLLMInsights ? '生成中...' : '生成AI总结'}
+            </button>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="bg-blue-50 rounded-xl p-4">
+              <div className="text-sm font-semibold text-blue-900 mb-2">前端总览</div>
+              <p className="text-sm text-blue-800 mb-3">{insights.frontend.overview}</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white/70 rounded px-2 py-1">路由数: {getMetric('frontend', 'route_count')}</div>
+                <div className="bg-white/70 rounded px-2 py-1">交互功能: {getMetric('frontend', 'page_function_count')}</div>
+                <div className="bg-white/70 rounded px-2 py-1">API调用: {getMetric('frontend', 'api_call_count')}</div>
+                <div className="bg-white/70 rounded px-2 py-1">活跃文件: {getMetric('frontend', 'active_file_count')}</div>
+              </div>
+            </div>
+
+            <div className="bg-indigo-50 rounded-xl p-4">
+              <div className="text-sm font-semibold text-indigo-900 mb-2">后端总览</div>
+              <p className="text-sm text-indigo-800 mb-3">{insights.backend.overview}</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white/70 rounded px-2 py-1">API数: {getMetric('backend', 'api_count')}</div>
+                <div className="bg-white/70 rounded px-2 py-1">模型数: {getMetric('backend', 'model_count')}</div>
+                <div className="bg-white/70 rounded px-2 py-1">系统能力: {getMetric('backend', 'system_feature_count')}</div>
+                <div className="bg-white/70 rounded px-2 py-1">鉴权API: {getMetric('backend', 'auth_api_count')}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 mt-4">
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="text-sm font-semibold text-gray-900 mb-2">前端关注点</div>
+              <ul className="space-y-1 text-sm text-gray-700 list-disc pl-4">
+                {(insights.frontend.highlights || []).map((h, idx) => (
+                  <li key={`fe-highlight-${idx}`}>{h}</li>
+                ))}
+              </ul>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="text-sm font-semibold text-gray-900 mb-2">后端关注点</div>
+              <ul className="space-y-1 text-sm text-gray-700 list-disc pl-4">
+                {(insights.backend.highlights || []).map((h, idx) => (
+                  <li key={`be-highlight-${idx}`}>{h}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {insights.llm?.enabled && (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                <div className="text-sm font-semibold text-amber-900 mb-2">AI前端总结</div>
+                <p className="text-sm text-amber-800 whitespace-pre-line">{insights.llm.frontend_summary}</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                <div className="text-sm font-semibold text-amber-900 mb-2">AI后端总结</div>
+                <p className="text-sm text-amber-800 whitespace-pre-line">{insights.llm.backend_summary}</p>
+              </div>
+            </div>
+          )}
+
+          {!insights.llm?.enabled && insights.llm?.error && (
+            <div className="mt-4 text-xs text-gray-500">AI总结未启用: {insights.llm.error}</div>
+          )}
+        </div>
+      )}
+
       <div className="flex items-center gap-2 border-b border-gray-200/50">
         {tabs.map((tab) => (
           <button
@@ -194,6 +300,35 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
         {activeTab === 'frontend' && (
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">前端功能 ({frontendFeatures?.length || 0})</h3>
+
+            {insights?.frontend?.page_analyses && insights.frontend.page_analyses.length > 0 && (
+              <div className="mb-4 bg-blue-50 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-blue-900 mb-3">逐页面分析 ({insights.frontend.page_analyses.length})</h4>
+                <div className="grid gap-3">
+                  {insights.frontend.page_analyses.map((page, idx) => (
+                    <div key={`frontend-page-${idx}`} className="bg-white/80 rounded-lg p-3 border border-blue-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-semibold text-gray-900">{page.name}</div>
+                        <div className="text-xs text-gray-500">{formatFilePath(page.file_path)}</div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                        <div className="bg-blue-50 rounded px-2 py-1">路由: {page.route_count ?? 0}</div>
+                        <div className="bg-blue-50 rounded px-2 py-1">交互: {page.page_function_count ?? 0}</div>
+                        <div className="bg-blue-50 rounded px-2 py-1">API调用: {page.api_call_count ?? 0}</div>
+                      </div>
+                      {page.highlights?.length > 0 && (
+                        <ul className="list-disc pl-4 text-xs text-gray-700 space-y-0.5">
+                          {page.highlights.map((item, itemIdx) => (
+                            <li key={`frontend-page-h-${idx}-${itemIdx}`}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {frontendFeatures && frontendFeatures.length > 0 ? (
               <div className="space-y-3">
                 {(frontendFeatures || []).map((feature) => (
@@ -221,6 +356,36 @@ export default function FeatureAnalysis({ projectId, project }: FeatureAnalysisP
         {activeTab === 'backend' && (
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">后端功能 ({backendFeatures?.length || 0})</h3>
+
+            {insights?.backend?.page_analyses && insights.backend.page_analyses.length > 0 && (
+              <div className="mb-4 bg-indigo-50 rounded-xl p-4">
+                <h4 className="text-sm font-semibold text-indigo-900 mb-3">逐模块分析 ({insights.backend.page_analyses.length})</h4>
+                <div className="grid gap-3">
+                  {insights.backend.page_analyses.map((page, idx) => (
+                    <div key={`backend-page-${idx}`} className="bg-white/80 rounded-lg p-3 border border-indigo-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-semibold text-gray-900">{page.name}</div>
+                        <div className="text-xs text-gray-500">{formatFilePath(page.file_path)}</div>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-xs mb-2">
+                        <div className="bg-indigo-50 rounded px-2 py-1">API: {page.api_count ?? 0}</div>
+                        <div className="bg-indigo-50 rounded px-2 py-1">模型: {page.model_count ?? 0}</div>
+                        <div className="bg-indigo-50 rounded px-2 py-1">系统能力: {page.system_feature_count ?? 0}</div>
+                        <div className="bg-indigo-50 rounded px-2 py-1">鉴权API: {page.auth_api_count ?? 0}</div>
+                      </div>
+                      {page.highlights?.length > 0 && (
+                        <ul className="list-disc pl-4 text-xs text-gray-700 space-y-0.5">
+                          {page.highlights.map((item, itemIdx) => (
+                            <li key={`backend-page-h-${idx}-${itemIdx}`}>{item}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {backendFeatures && backendFeatures.length > 0 ? (
               <div className="space-y-3">
                 {(backendFeatures || []).map((feature) => (

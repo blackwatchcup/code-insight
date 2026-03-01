@@ -12,6 +12,7 @@ interface FeatureStore {
   getApiEndpoints: (projectId: string) => Promise<any[]>
   getDataModels: (projectId: string) => Promise<any[]>
   getSystemFeatures: (projectId: string) => Promise<any[]>
+  getFeatureInsights: (projectId: string, useLLM?: boolean) => Promise<any>
 }
 
 export const useFeatureStore = create<FeatureStore>((set) => ({
@@ -104,6 +105,21 @@ export const useFeatureStore = create<FeatureStore>((set) => ({
       return res.data?.data || res.data
     } catch (err: any) {
       const errorMsg = err.response?.data?.detail || err.message || 'Failed to load system features'
+      set({ error: errorMsg, isLoading: false })
+      throw new Error(errorMsg)
+    }
+  },
+
+  getFeatureInsights: async (projectId: string, useLLM: boolean = false) => {
+    set({ isLoading: true, error: null })
+    try {
+      const res = await api.get(`/features/${projectId}/insights`, {
+        params: { llm: useLLM },
+      })
+      set({ isLoading: false })
+      return res.data?.data || res.data
+    } catch (err: any) {
+      const errorMsg = err.response?.data?.detail || err.message || 'Failed to load feature insights'
       set({ error: errorMsg, isLoading: false })
       throw new Error(errorMsg)
     }

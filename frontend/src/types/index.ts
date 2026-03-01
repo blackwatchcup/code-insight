@@ -95,6 +95,54 @@ export interface DataModel {
   }>
 }
 
+export interface FeatureInsightStat {
+  name: string
+  count: number
+}
+
+export interface FeaturePageAnalysis {
+  name: string
+  file_path: string
+  highlights: string[]
+  route_count?: number
+  page_function_count?: number
+  api_call_count?: number
+  api_count?: number
+  model_count?: number
+  system_feature_count?: number
+  auth_api_count?: number
+  top_types?: FeatureInsightStat[]
+  top_api_methods?: FeatureInsightStat[]
+  top_system_features?: FeatureInsightStat[]
+  sample_routes?: string[]
+  sample_api_paths?: string[]
+}
+
+export interface FeatureInsightsSection {
+  overview: string
+  metrics: Record<string, number>
+  top_files: FeatureInsightStat[]
+  highlights: string[]
+  page_analyses?: FeaturePageAnalysis[]
+  top_types?: FeatureInsightStat[]
+  top_api_methods?: FeatureInsightStat[]
+  top_api_groups?: FeatureInsightStat[]
+  top_system_features?: FeatureInsightStat[]
+  sample_routes?: string[]
+}
+
+export interface FeatureInsightsData {
+  frontend: FeatureInsightsSection
+  backend: FeatureInsightsSection
+  llm: {
+    enabled: boolean
+    frontend_summary: string
+    backend_summary: string
+    model: string
+    error: string
+  }
+}
+
 export interface ProjectStructure {
   project_path: string
   summary: {

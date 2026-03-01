@@ -164,3 +164,29 @@ async def get_system_features(
     features = await feature_service.get_system_features(str(project.local_path))
 
     return {"code": 200, "data": features}
+
+
+@router.get("/{project_id}/insights", tags=["Features"])
+async def get_feature_insights(
+    project_id: str,
+    llm: bool = False,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user),
+):
+    project_service = ProjectService(db)
+    project = project_service.get_project(project_id)
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if current_user and not current_user.is_admin():
+        if project.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    feature_service = FeatureService(db)
+    insights = await feature_service.get_feature_insights(
+        str(project.local_path),
+        include_llm=llm,
+    )
+
+    return {"code": 200, "data": insights}
