@@ -101,13 +101,18 @@ def _build_dependency_tree(dep_graph: Any) -> Dict[str, Any]:
     external_children: List[Dict[str, Any]] = []
     for module in external_names:
         imported_by = sorted(set(module_imported_by.get(module, [])))
+        module_node = external_modules.get(module)
+        version = module_node.version if module_node else None
 
         external_children.append(
             {
                 "id": f"external:{module}",
                 "name": module,
                 "type": "external_module",
-                "meta": {"imported_by_count": len(imported_by)},
+                "meta": {
+                    "imported_by_count": len(imported_by),
+                    "version": version,
+                },
                 "children": [
                     {
                         "id": f"used-by:{module}",

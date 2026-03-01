@@ -201,6 +201,7 @@ export interface DependencyModuleNode {
   name: string
   file_path: string
   is_external: boolean
+  version?: string | null
 }
 
 export interface DependencyEdge {
@@ -223,7 +224,7 @@ export interface DependencyTreeNode {
     | 'used_by_module'
     | 'truncated'
   children: DependencyTreeNode[]
-  meta?: Record<string, number>
+  meta?: Record<string, string | number | null>
 }
 
 export interface DependencyGraphData {

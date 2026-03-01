@@ -4,6 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Set
+from xml.etree import ElementTree as ET
 
 from app.parsers.base import ImportInfo, ParseResult
 
@@ -13,12 +14,14 @@ class ModuleNode:
     name: str
     file_path: str
     is_external: bool
+    version: Optional[str] = None
 
     def to_dict(self) -> Dict:
         return {
             "name": self.name,
             "file_path": self.file_path,
             "is_external": self.is_external,
+            "version": self.version,
         }
 
 
@@ -127,7 +130,7 @@ class DependencyAnalyzer:
                     module_imported_by[target_module].append(source_module)
 
         manifest_deps = self._extract_manifest_dependencies()
-        for dep in manifest_deps:
+        for dep, version in manifest_deps.items():
             if not dep or self._is_internal(dep):
                 continue
             if dep not in external_modules:
@@ -135,6 +138,14 @@ class DependencyAnalyzer:
                     name=dep,
                     file_path="",
                     is_external=True,
+                    version=version,
+                )
+            elif version and not external_modules[dep].version:
+                external_modules[dep] = ModuleNode(
+                    name=dep,
+                    file_path="",
+                    is_external=True,
+                    version=version,
                 )
 
         return DependencyGraph(
@@ -187,68 +198,156 @@ class DependencyAnalyzer:
 
         return False
 
-    def _extract_manifest_dependencies(self) -> Set[str]:
+    def _extract_manifest_dependencies(self) -> Dict[str, str]:
         if not self.project_path:
-            return set()
+            return {}
 
-        deps: Set[str] = set()
+        deps: Dict[str, str] = {}
 
-        package_json_path = self.project_path / "package.json"
-        if package_json_path.exists():
-            try:
-                package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
-                for key in (
-                    "dependencies",
-                    "devDependencies",
-                    "peerDependencies",
-                    "optionalDependencies",
-                ):
-                    value = package_json.get(key, {})
-                    if isinstance(value, dict):
-                        deps.update(name.strip() for name in value.keys() if isinstance(name, str))
-            except Exception:
-                pass
+        skip_dirs = {
+            ".git",
+            "node_modules",
+            "dist",
+            "build",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "target",
+            "out",
+            "coverage",
+        }
 
-        requirements_path = self.project_path / "requirements.txt"
-        if requirements_path.exists():
-            try:
-                for line in requirements_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-                    cleaned = line.strip()
-                    if not cleaned or cleaned.startswith("#"):
-                        continue
-                    pkg = re.split(r"[<>=!~\[]", cleaned, maxsplit=1)[0].strip()
-                    if pkg:
-                        deps.add(pkg)
-            except Exception:
-                pass
+        for file_path in self.project_path.rglob("*"):
+            if not file_path.is_file():
+                continue
 
-        pyproject_path = self.project_path / "pyproject.toml"
-        if pyproject_path.exists():
-            try:
-                text = pyproject_path.read_text(encoding="utf-8", errors="ignore")
-                for match in re.findall(r'"([A-Za-z0-9_.\-]+)(?:\[[^\]]+\])?(?:\s*[<>=!~].*?)?"', text):
-                    if match and match not in {"python", "setuptools", "wheel"}:
-                        deps.add(match)
-            except Exception:
-                pass
+            if any(part in skip_dirs for part in file_path.parts):
+                continue
 
-        gomod_path = self.project_path / "go.mod"
-        if gomod_path.exists():
-            try:
-                for line in gomod_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-                    cleaned = line.strip()
-                    if not cleaned or cleaned.startswith("module ") or cleaned.startswith("go "):
-                        continue
-                    if cleaned.startswith("require "):
-                        parts = cleaned.split()
-                        if len(parts) >= 2:
-                            deps.add(parts[1].strip())
-                    elif cleaned.startswith("replace "):
-                        continue
-            except Exception:
-                pass
+            file_name = file_path.name.lower()
 
-        return {self._normalize_import(dep) for dep in deps if dep}
+            if file_name == "package.json":
+                self._merge_dependency_versions(deps, self._extract_from_package_json(file_path))
+            elif file_name.startswith("requirements") and file_name.endswith(".txt"):
+                self._merge_dependency_versions(deps, self._extract_from_requirements(file_path))
+            elif file_name == "pyproject.toml":
+                self._merge_dependency_versions(deps, self._extract_from_pyproject(file_path))
+            elif file_name == "go.mod":
+                self._merge_dependency_versions(deps, self._extract_from_go_mod(file_path))
+            elif file_name == "pom.xml":
+                self._merge_dependency_versions(deps, self._extract_from_pom_xml(file_path))
+
+        normalized: Dict[str, str] = {}
+        for dep, version in deps.items():
+            normalized_name = self._normalize_import(dep)
+            if not normalized_name:
+                continue
+            existing = normalized.get(normalized_name)
+            if not existing:
+                normalized[normalized_name] = version
+
+        return normalized
+
+    def _merge_dependency_versions(self, target: Dict[str, str], incoming: Dict[str, str]):
+        for name, version in incoming.items():
+            if not name:
+                continue
+            if name not in target or (version and not target[name]):
+                target[name] = version
+
+    def _extract_from_package_json(self, file_path: Path) -> Dict[str, str]:
+        deps: Dict[str, str] = {}
+        try:
+            package_json = json.loads(file_path.read_text(encoding="utf-8", errors="ignore"))
+            for key in (
+                "dependencies",
+                "devDependencies",
+                "peerDependencies",
+                "optionalDependencies",
+            ):
+                value = package_json.get(key, {})
+                if isinstance(value, dict):
+                    for name, ver in value.items():
+                        if isinstance(name, str):
+                            deps[name.strip()] = str(ver).strip() if ver is not None else ""
+        except Exception:
+            pass
+        return deps
+
+    def _extract_from_requirements(self, file_path: Path) -> Dict[str, str]:
+        deps: Dict[str, str] = {}
+        try:
+            for line in file_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                cleaned = line.strip()
+                if not cleaned or cleaned.startswith("#"):
+                    continue
+                if cleaned.startswith("-r") or cleaned.startswith("--requirement"):
+                    continue
+                match = re.match(r"^([A-Za-z0-9_.\-]+)(.*)$", cleaned)
+                if not match:
+                    continue
+                pkg = match.group(1).strip()
+                version = match.group(2).strip()
+                if pkg:
+                    deps[pkg] = version
+        except Exception:
+            pass
+        return deps
+
+    def _extract_from_pyproject(self, file_path: Path) -> Dict[str, str]:
+        deps: Dict[str, str] = {}
+        try:
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
+            matches = re.findall(
+                r'"([A-Za-z0-9_.\-]+)(?:\[[^\]]+\])?(\s*[<>=!~].*?)?"',
+                text,
+            )
+            for name, ver in matches:
+                if name and name.lower() not in {"python", "setuptools", "wheel"}:
+                    deps[name] = (ver or "").strip()
+        except Exception:
+            pass
+        return deps
+
+    def _extract_from_go_mod(self, file_path: Path) -> Dict[str, str]:
+        deps: Dict[str, str] = {}
+        try:
+            for line in file_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                cleaned = line.strip()
+                if not cleaned or cleaned.startswith("module ") or cleaned.startswith("go "):
+                    continue
+                if cleaned.startswith("require "):
+                    parts = cleaned.split()
+                    if len(parts) >= 3:
+                        deps[parts[1].strip()] = parts[2].strip()
+                    elif len(parts) >= 2:
+                        deps[parts[1].strip()] = ""
+        except Exception:
+            pass
+        return deps
+
+    def _extract_from_pom_xml(self, file_path: Path) -> Dict[str, str]:
+        deps: Dict[str, str] = {}
+        try:
+            tree = ET.parse(file_path)
+            root = tree.getroot()
+            ns = ""
+            if root.tag.startswith("{"):
+                ns = root.tag.split("}")[0] + "}"
+
+            for dep in root.findall(f".//{ns}dependency"):
+                artifact = dep.find(f"{ns}artifactId")
+                group = dep.find(f"{ns}groupId")
+                version = dep.find(f"{ns}version")
+                artifact_text = (artifact.text or "").strip() if artifact is not None else ""
+                group_text = (group.text or "").strip() if group is not None else ""
+                version_text = (version.text or "").strip() if version is not None else ""
+                if artifact_text:
+                    name = f"{group_text}:{artifact_text}" if group_text else artifact_text
+                    deps[name] = version_text
+        except Exception:
+            pass
+        return deps
 
     def get_imports(self, module: str) -> List[str]:
         return list(self._module_imports.get(module, []))

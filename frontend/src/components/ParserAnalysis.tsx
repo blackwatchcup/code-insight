@@ -340,6 +340,7 @@ export default function ParserAnalysis({ projectId, project }: ParserAnalysisPro
       type: 'external_module',
       meta: {
         imported_by_count: (externalUsedByMap.get(depName) ?? new Set()).size,
+        version: data.graph.external_modules[depName]?.version ?? null,
       },
       children: (externalUsedByMap.get(depName) ?? new Set()).size
         ? [
@@ -410,10 +411,16 @@ export default function ParserAnalysis({ projectId, project }: ParserAnalysisPro
     return null
   }
 
+  const getNodeVersion = (node: DependencyTreeNode): string => {
+    const version = node.meta?.version
+    return typeof version === 'string' ? version : ''
+  }
+
   const renderDependencyMindmap = (node: DependencyTreeNode): JSX.Element => {
     const hasChildren = node.children.length > 0
     const isExpanded = expandedDependencyNodes.has(node.id)
     const count = getNodeMetaCount(node)
+    const version = getNodeVersion(node)
 
     return (
       <div key={node.id} className="py-1">
@@ -437,6 +444,7 @@ export default function ParserAnalysis({ projectId, project }: ParserAnalysisPro
             <span className="w-3.5" />
           )}
           <span className="text-sm font-medium truncate">{node.name}</span>
+          {version && <span className="text-[11px] opacity-80">{version}</span>}
           {count !== null && <span className="ml-auto text-xs opacity-80">{count}</span>}
         </button>
 
