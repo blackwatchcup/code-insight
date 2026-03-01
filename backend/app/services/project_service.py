@@ -166,7 +166,11 @@ class ProjectService:
         # 优先使用生成的项目摘要
         description = project.project_summary or ""
         
-        # 如果没有生成的摘要，尝试读取README.md文件
+        # 如果没有生成的摘要，使用数据库中的README内容
+        if not description and project.readme_content:
+            description = project.readme_content
+        
+        # 如果数据库中也没有README内容，尝试从文件系统读取README.md文件
         if not description:
             readme_path = Path(project.local_path) / "README.md"
             if readme_path.exists():

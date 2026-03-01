@@ -1,3 +1,4 @@
+import asyncio
 import os
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -25,63 +26,48 @@ class FeatureService:
         self.api_extractor = APIExtractor()
         self.feature_detector = SystemFeatureDetector()
         self.model_extractor = ModelExtractor()
+        self.cache: Dict[str, Dict] = {}  # 缓存分析结果
+        self.cache_timeout = 3600  # 缓存过期时间（秒）
 
     async def analyze_project(self, project_path: str, project_id: str) -> FeatureTree:
-        routes: List[RouteInfo] = []
-        page_functions: Dict[str, List[PageFunction]] = {}
-        api_calls: Dict[str, List[APICallInfo]] = {}
-        apis: List[APIEndpoint] = []
-        system_features: List[SystemFeature] = []
-        models: List[DataModel] = []
+        # 检查缓存
+        cache_key = self._get_cache_key(project_path, 'feature_tree')
+        cached_tree = self._get_cache(cache_key)
+        if cached_tree:
+            # 从缓存中重建FeatureTree
+            builder = FeatureTreeBuilder(project_id)
+            tree = builder.build(
+                routes=cached_tree['routes'],
+                page_functions=cached_tree['page_functions'],
+                api_calls=cached_tree['api_calls'],
+                apis=cached_tree['apis'],
+                system_features=cached_tree['system_features'],
+                models=cached_tree['models'],
+            )
+            return tree
 
         project_dir = Path(project_path)
-
-        for file_path in project_dir.rglob("*"):
-            if not file_path.is_file():
-                continue
-
-            if self._should_skip(file_path):
-                continue
-
-            try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                relative_path = str(file_path.relative_to(project_dir))
-
-                if self._is_frontend_file(file_path):
-                    file_routes = self.route_parser.parse(content, str(file_path))
-                    routes.extend(file_routes)
-
-                    functions = self.frontend_analyzer.extract_functions(content, str(file_path))
-                    if functions:
-                        page_functions[relative_path] = functions
-
-                    calls = self.api_call_analyzer.analyze(content, str(file_path))
-                    if calls:
-                        api_calls[relative_path] = calls
-
-                if self._is_backend_file(file_path):
-                    file_apis = self.api_extractor.extract(content, str(file_path))
-                    apis.extend(file_apis)
-
-                    file_models = self.model_extractor.extract(content, str(file_path))
-                    models.extend(file_models)
-
-                features = self.feature_detector.detect(content, str(file_path))
-                system_features.extend(features)
-
-            except Exception as e:
-                print(f"Error analyzing {file_path}: {e}")
-                continue
+        results = await self._analyze_files(project_dir, 'all')
 
         builder = FeatureTreeBuilder(project_id)
         tree = builder.build(
-            routes=routes,
-            page_functions=page_functions,
-            api_calls=api_calls,
-            apis=apis,
-            system_features=system_features,
-            models=models,
+            routes=results['routes'],
+            page_functions=results['page_functions'],
+            api_calls=results['api_calls'],
+            apis=results['apis'],
+            system_features=results['system_features'],
+            models=results['models'],
         )
+
+        # 缓存结果
+        self._set_cache(cache_key, {
+            'routes': results['routes'],
+            'page_functions': results['page_functions'],
+            'api_calls': results['api_calls'],
+            'apis': results['apis'],
+            'system_features': results['system_features'],
+            'models': results['models'],
+        })
 
         return tree
 
@@ -89,143 +75,92 @@ class FeatureService:
         return await self.analyze_project(project_path, project_id)
 
     async def get_frontend_features(self, project_path: str) -> Dict:
-        routes: List[RouteInfo] = []
-        page_functions: Dict[str, List[PageFunction]] = {}
-        api_calls: Dict[str, List[APICallInfo]] = {}
+        # 检查缓存
+        cache_key = self._get_cache_key(project_path, 'frontend')
+        cached_data = self._get_cache(cache_key)
+        if cached_data:
+            return cached_data
 
         project_dir = Path(project_path)
+        results = await self._analyze_files(project_dir, 'frontend')
 
-        for file_path in project_dir.rglob("*"):
-            if not file_path.is_file() or self._should_skip(file_path):
-                continue
-
-            if not self._is_frontend_file(file_path):
-                continue
-
-            try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                relative_path = str(file_path.relative_to(project_dir))
-
-                file_routes = self.route_parser.parse(content, str(file_path))
-                routes.extend(file_routes)
-
-                functions = self.frontend_analyzer.extract_functions(content, str(file_path))
-                if functions:
-                    page_functions[relative_path] = functions
-
-                calls = self.api_call_analyzer.analyze(content, str(file_path))
-                if calls:
-                    api_calls[relative_path] = calls
-
-            except Exception:
-                continue
-
-        return {
-            "routes": [r.to_dict() for r in routes],
-            "page_functions": {k: [f.to_dict() for f in v] for k, v in page_functions.items()},
-            "api_calls": {k: [c.to_dict() for c in v] for k, v in api_calls.items()},
+        result = {
+            "routes": [r.to_dict() for r in results['routes']],
+            "page_functions": {k: [f.to_dict() for f in v] for k, v in results['page_functions'].items()},
+            "api_calls": {k: [c.to_dict() for c in v] for k, v in results['api_calls'].items()},
         }
+
+        # 缓存结果
+        self._set_cache(cache_key, result)
+        return result
 
     async def get_backend_features(self, project_path: str) -> Dict:
-        api_dict: Dict[str, APIEndpoint] = {}
-        system_features: List[SystemFeature] = []
-        models: List[DataModel] = []
+        # 检查缓存
+        cache_key = self._get_cache_key(project_path, 'backend')
+        cached_data = self._get_cache(cache_key)
+        if cached_data:
+            return cached_data
 
         project_dir = Path(project_path)
+        results = await self._analyze_files(project_dir, 'backend')
 
-        for file_path in project_dir.rglob("*"):
-            if not file_path.is_file() or self._should_skip(file_path):
-                continue
-
-            if not self._is_backend_file(file_path):
-                continue
-
-            try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-
-                file_apis = self.api_extractor.extract(content, str(file_path))
-                # 去重处理 API 端点
-                for api in file_apis:
-                    key = f"{api.method}{api.path}"
-                    if key not in api_dict:
-                        api_dict[key] = api
-
-                file_models = self.model_extractor.extract(content, str(file_path))
-                models.extend(file_models)
-
-                features = self.feature_detector.detect(content, str(file_path))
-                system_features.extend(features)
-
-            except Exception:
-                continue
-
-        return {
-            "apis": [a.to_dict() for a in api_dict.values()],
-            "system_features": [f.to_dict() for f in system_features],
-            "models": [m.to_dict() for m in models],
+        result = {
+            "apis": [a.to_dict() for a in results['apis']],
+            "system_features": [f.to_dict() for f in results['system_features']],
+            "models": [m.to_dict() for m in results['models']],
         }
 
+        # 缓存结果
+        self._set_cache(cache_key, result)
+        return result
+
     async def get_api_endpoints(self, project_path: str) -> List[Dict]:
-        api_dict: Dict[str, APIEndpoint] = {}
+        # 检查缓存
+        cache_key = self._get_cache_key(project_path, 'apis')
+        cached_data = self._get_cache(cache_key)
+        if cached_data:
+            return cached_data
+
         project_dir = Path(project_path)
+        results = await self._analyze_files(project_dir, 'backend')
 
-        for file_path in project_dir.rglob("*"):
-            if not file_path.is_file() or self._should_skip(file_path):
-                continue
+        result = [a.to_dict() for a in results['apis']]
 
-            if not self._is_backend_file(file_path):
-                continue
-
-            try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                file_apis = self.api_extractor.extract(content, str(file_path))
-                
-                # 去重处理，使用 method + path 作为唯一键
-                for api in file_apis:
-                    key = f"{api.method}{api.path}"
-                    if key not in api_dict:
-                        api_dict[key] = api
-            except Exception:
-                continue
-
-        return [a.to_dict() for a in api_dict.values()]
+        # 缓存结果
+        self._set_cache(cache_key, result)
+        return result
 
     async def get_data_models(self, project_path: str) -> List[Dict]:
-        models: List[DataModel] = []
+        # 检查缓存
+        cache_key = self._get_cache_key(project_path, 'models')
+        cached_data = self._get_cache(cache_key)
+        if cached_data:
+            return cached_data
+
         project_dir = Path(project_path)
+        results = await self._analyze_files(project_dir, 'backend')
 
-        for file_path in project_dir.rglob("*"):
-            if not file_path.is_file() or self._should_skip(file_path):
-                continue
+        result = [m.to_dict() for m in results['models']]
 
-            if not self._is_backend_file(file_path):
-                continue
-
-            try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                file_models = self.model_extractor.extract(content, str(file_path))
-                models.extend(file_models)
-            except Exception:
-                continue
-
-        return [m.to_dict() for m in models]
+        # 缓存结果
+        self._set_cache(cache_key, result)
+        return result
 
     async def get_system_features(self, project_path: str) -> List[Dict]:
-        features: List[SystemFeature] = []
+        # 检查缓存
+        cache_key = self._get_cache_key(project_path, 'system')
+        cached_data = self._get_cache(cache_key)
+        if cached_data:
+            return cached_data
+
         project_dir = Path(project_path)
+        results = await self._analyze_files(project_dir, 'all')
 
-        for file_path in project_dir.rglob("*"):
-            if not file_path.is_file() or self._should_skip(file_path):
-                continue
+        result = [f.to_dict() for f in results['system_features']]
 
-            try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                file_features = self.feature_detector.detect(content, str(file_path))
-                features.extend(file_features)
-            except Exception:
-                continue
-
-        return [f.to_dict() for f in features]
+        # 缓存结果
+        self._set_cache(cache_key, result)
+        return result
 
     async def get_feature_insights(self, project_path: str, include_llm: bool = False) -> Dict[str, Any]:
         frontend_data = await self.get_frontend_features(project_path)
@@ -614,3 +549,98 @@ class FeatureService:
     def _is_backend_file(self, file_path: Path) -> bool:
         backend_extensions = {".py", ".java", ".go", ".rs", ".rb", ".php", ".cs"}
         return file_path.suffix in backend_extensions
+
+    def _get_cache_key(self, project_path: str, method: str) -> str:
+        """生成缓存键"""
+        return f"{method}:{project_path}"
+
+    def _get_cache(self, key: str) -> Optional[Any]:
+        """获取缓存"""
+        if key in self.cache:
+            cached_data = self.cache[key]
+            if cached_data.get('expiry', 0) > int(asyncio.get_event_loop().time()):
+                return cached_data['data']
+            else:
+                del self.cache[key]  # 缓存过期，删除
+        return None
+
+    def _set_cache(self, key: str, data: Any) -> None:
+        """设置缓存"""
+        self.cache[key] = {
+            'data': data,
+            'expiry': int(asyncio.get_event_loop().time()) + self.cache_timeout
+        }
+
+    async def _analyze_files(self, project_dir: Path, file_type: str) -> Dict:
+        """异步分析文件"""
+        routes: List[RouteInfo] = []
+        page_functions: Dict[str, List[PageFunction]] = {}
+        api_calls: Dict[str, List[APICallInfo]] = {}
+        api_dict: Dict[str, APIEndpoint] = {}
+        system_features: List[SystemFeature] = []
+        models: List[DataModel] = []
+
+        # 收集需要处理的文件
+        files_to_process = []
+        for file_path in project_dir.rglob("*"):
+            if not file_path.is_file() or self._should_skip(file_path):
+                continue
+
+            if file_type == 'frontend' and not self._is_frontend_file(file_path):
+                continue
+            elif file_type == 'backend' and not self._is_backend_file(file_path):
+                continue
+            elif file_type == 'all':
+                if not (self._is_frontend_file(file_path) or self._is_backend_file(file_path)):
+                    continue
+
+            files_to_process.append(file_path)
+
+        # 限制并发处理的文件数量
+        semaphore = asyncio.Semaphore(10)  # 最多10个并发
+
+        async def process_file(file_path: Path):
+            async with semaphore:
+                try:
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
+                    relative_path = str(file_path.relative_to(project_dir))
+
+                    if self._is_frontend_file(file_path):
+                        file_routes = self.route_parser.parse(content, str(file_path))
+                        routes.extend(file_routes)
+
+                        functions = self.frontend_analyzer.extract_functions(content, str(file_path))
+                        if functions:
+                            page_functions[relative_path] = functions
+
+                        calls = self.api_call_analyzer.analyze(content, str(file_path))
+                        if calls:
+                            api_calls[relative_path] = calls
+
+                    if self._is_backend_file(file_path):
+                        file_apis = self.api_extractor.extract(content, str(file_path))
+                        for api in file_apis:
+                            key = f"{api.method}{api.path}"
+                            if key not in api_dict:
+                                api_dict[key] = api
+
+                        file_models = self.model_extractor.extract(content, str(file_path))
+                        models.extend(file_models)
+
+                    features = self.feature_detector.detect(content, str(file_path))
+                    system_features.extend(features)
+
+                except Exception:
+                    pass
+
+        # 并行处理文件
+        await asyncio.gather(*[process_file(file) for file in files_to_process])
+
+        return {
+            'routes': routes,
+            'page_functions': page_functions,
+            'api_calls': api_calls,
+            'apis': list(api_dict.values()),
+            'system_features': system_features,
+            'models': models
+        }

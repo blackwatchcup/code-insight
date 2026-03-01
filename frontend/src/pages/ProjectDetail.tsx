@@ -296,7 +296,7 @@ export default function ProjectDetail() {
       </div>
 
       {activeTab === 'overview' && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-white rounded-lg shadow-sm">
@@ -330,35 +330,36 @@ export default function ProjectDetail() {
               </div>
               <span className="text-sm text-purple-600 font-medium">状态</span>
             </div>
-            <div className="text-lg font-bold text-purple-900">
+            <div className="text-2xl font-bold text-purple-900">
               {project?.status === 'ready' ? '就绪' : project?.status === 'error' ? '错误' : project?.status === 'indexing' ? '索引中' : '未知'}
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-100">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-white rounded-lg shadow-sm">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
-              <span className="text-sm text-gray-600 font-medium">创建时间</span>
+              <span className="text-sm text-blue-600 font-medium">创建时间</span>
             </div>
-            <div className="text-sm font-semibold text-gray-900">
-              {project?.created_at ? new Date(project.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '未知'}
+            <div className="text-2xl font-bold text-blue-900">
+              {project?.created_at ? new Date(new Date(project.created_at).getTime() + 8 * 60 * 60 * 1000).toLocaleString('zh-CN', { hour12: false }) : '未知'}
             </div>
           </div>
-          <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-5">
+
+          <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-5 border border-purple-100">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-white rounded-lg shadow-sm">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <span className="text-sm text-gray-600 font-medium">更新时间</span>
+              <span className="text-sm text-purple-600 font-medium">更新时间</span>
             </div>
-            <div className="text-sm font-semibold text-gray-900">
-              {project?.updated_at ? new Date(project.updated_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '未知'}
+            <div className="text-2xl font-bold text-purple-900">
+              {project?.updated_at ? new Date(new Date(project.updated_at).getTime() + 8 * 60 * 60 * 1000).toLocaleString('zh-CN', { hour12: false }) : '未知'}
             </div>
           </div>
         </div>
@@ -411,7 +412,7 @@ export default function ProjectDetail() {
                   <div className="bg-gray-50 rounded-xl p-4">
                     <div className="text-sm text-gray-600 mb-1">创建时间</div>
                     <div className="text-lg font-semibold text-gray-900">
-                      {project?.created_at ? new Date(project.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false }) : '未知'}
+                      {project?.created_at ? new Date(new Date(project.created_at).getTime() + 8 * 60 * 60 * 1000).toLocaleString('zh-CN', { hour12: false }) : '未知'}
                     </div>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-4">
