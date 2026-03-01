@@ -31,7 +31,7 @@ call_graph_builder = CallGraphBuilder()
 dependency_analyzer = DependencyAnalyzer()
 
 
-def _build_dependency_tree(dep_graph: Any, max_items_per_group: int = 80) -> Dict[str, Any]:
+def _build_dependency_tree(dep_graph: Any) -> Dict[str, Any]:
     internal_modules = dep_graph.internal_modules
     external_modules = dep_graph.external_modules
     module_imports = dep_graph.module_imports or {}
@@ -41,7 +41,7 @@ def _build_dependency_tree(dep_graph: Any, max_items_per_group: int = 80) -> Dic
     external_names = sorted(external_modules.keys())
 
     internal_children: List[Dict[str, Any]] = []
-    for module in internal_names[:max_items_per_group]:
+    for module in internal_names:
         imports = sorted(set(module_imports.get(module, [])))
         internal_imports = [name for name in imports if name in internal_modules]
         external_imports = [name for name in imports if name in external_modules]
@@ -98,18 +98,8 @@ def _build_dependency_tree(dep_graph: Any, max_items_per_group: int = 80) -> Dic
             }
         )
 
-    if len(internal_names) > max_items_per_group:
-        internal_children.append(
-            {
-                "id": "internal:truncated",
-                "name": f"还有 {len(internal_names) - max_items_per_group} 个内部模块未展示",
-                "type": "truncated",
-                "children": [],
-            }
-        )
-
     external_children: List[Dict[str, Any]] = []
-    for module in external_names[:max_items_per_group]:
+    for module in external_names:
         imported_by = sorted(set(module_imported_by.get(module, [])))
 
         external_children.append(
@@ -130,34 +120,12 @@ def _build_dependency_tree(dep_graph: Any, max_items_per_group: int = 80) -> Dic
                                 "type": "used_by_module",
                                 "children": [],
                             }
-                            for source in imported_by[:30]
-                        ]
-                        + (
-                            [
-                                {
-                                    "id": f"used-by:{module}:truncated",
-                                    "name": f"还有 {len(imported_by) - 30} 个模块未展示",
-                                    "type": "truncated",
-                                    "children": [],
-                                }
-                            ]
-                            if len(imported_by) > 30
-                            else []
-                        ),
+                            for source in imported_by
+                        ],
                     }
                 ]
                 if imported_by
                 else [],
-            }
-        )
-
-    if len(external_names) > max_items_per_group:
-        external_children.append(
-            {
-                "id": "external:truncated",
-                "name": f"还有 {len(external_names) - max_items_per_group} 个外部依赖未展示",
-                "type": "truncated",
-                "children": [],
             }
         )
 

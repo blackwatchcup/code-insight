@@ -1,3 +1,5 @@
+import json
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -124,6 +126,17 @@ class DependencyAnalyzer:
                     module_imports[source_module].append(target_module)
                     module_imported_by[target_module].append(source_module)
 
+        manifest_deps = self._extract_manifest_dependencies()
+        for dep in manifest_deps:
+            if not dep or self._is_internal(dep):
+                continue
+            if dep not in external_modules:
+                external_modules[dep] = ModuleNode(
+                    name=dep,
+                    file_path="",
+                    is_external=True,
+                )
+
         return DependencyGraph(
             internal_modules=internal_modules,
             external_modules=external_modules,
@@ -158,6 +171,10 @@ class DependencyAnalyzer:
     def _normalize_import(self, module: str) -> str:
         module = module.lstrip(".")
         module = module.lstrip("/")
+        if module.startswith("@") and "/" in module:
+            parts = module.split("/")
+            if len(parts) >= 2:
+                return "/".join(parts[:2])
         return module.split("/")[0] if "/" in module else module
 
     def _is_internal(self, module: str) -> bool:
@@ -169,6 +186,69 @@ class DependencyAnalyzer:
                 return True
 
         return False
+
+    def _extract_manifest_dependencies(self) -> Set[str]:
+        if not self.project_path:
+            return set()
+
+        deps: Set[str] = set()
+
+        package_json_path = self.project_path / "package.json"
+        if package_json_path.exists():
+            try:
+                package_json = json.loads(package_json_path.read_text(encoding="utf-8"))
+                for key in (
+                    "dependencies",
+                    "devDependencies",
+                    "peerDependencies",
+                    "optionalDependencies",
+                ):
+                    value = package_json.get(key, {})
+                    if isinstance(value, dict):
+                        deps.update(name.strip() for name in value.keys() if isinstance(name, str))
+            except Exception:
+                pass
+
+        requirements_path = self.project_path / "requirements.txt"
+        if requirements_path.exists():
+            try:
+                for line in requirements_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    cleaned = line.strip()
+                    if not cleaned or cleaned.startswith("#"):
+                        continue
+                    pkg = re.split(r"[<>=!~\[]", cleaned, maxsplit=1)[0].strip()
+                    if pkg:
+                        deps.add(pkg)
+            except Exception:
+                pass
+
+        pyproject_path = self.project_path / "pyproject.toml"
+        if pyproject_path.exists():
+            try:
+                text = pyproject_path.read_text(encoding="utf-8", errors="ignore")
+                for match in re.findall(r'"([A-Za-z0-9_.\-]+)(?:\[[^\]]+\])?(?:\s*[<>=!~].*?)?"', text):
+                    if match and match not in {"python", "setuptools", "wheel"}:
+                        deps.add(match)
+            except Exception:
+                pass
+
+        gomod_path = self.project_path / "go.mod"
+        if gomod_path.exists():
+            try:
+                for line in gomod_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+                    cleaned = line.strip()
+                    if not cleaned or cleaned.startswith("module ") or cleaned.startswith("go "):
+                        continue
+                    if cleaned.startswith("require "):
+                        parts = cleaned.split()
+                        if len(parts) >= 2:
+                            deps.add(parts[1].strip())
+                    elif cleaned.startswith("replace "):
+                        continue
+            except Exception:
+                pass
+
+        return {self._normalize_import(dep) for dep in deps if dep}
 
     def get_imports(self, module: str) -> List[str]:
         return list(self._module_imports.get(module, []))

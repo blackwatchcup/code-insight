@@ -389,11 +389,6 @@ export default function ParserAnalysis({ projectId, project }: ParserAnalysisPro
     if (!dependencies) {
       return null
     }
-
-    if (dependencies.dependency_tree) {
-      return dependencies.dependency_tree
-    }
-
     return buildFallbackDependencyTree(dependencies)
   }, [dependencies])
 
@@ -528,7 +523,7 @@ export default function ParserAnalysis({ projectId, project }: ParserAnalysisPro
               </div>
             </div>
 
-            <div className="bg-gray-50 rounded-xl p-4 max-h-[30rem] overflow-auto">
+            <div className="bg-gray-50 rounded-xl p-4">
               {dependencyTree ? (
                 <div className="space-y-1">{renderDependencyMindmap(dependencyTree)}</div>
               ) : (
